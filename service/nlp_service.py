@@ -18,9 +18,23 @@ class NLPProcessor:
         try:
             # 加载中文预训练模型
             self.nlp = spacy.load(Config.NLP_MODEL_NAME)
-            # 禁用不支持的组件并添加分句器
-            self.nlp.disable_pipes(["parser"])
-            self.nlp.add_pipe("sentencizer")
+
+            # 仅禁用存在的组件 - 关键修复
+            disable_pipes = []
+            # 检查模型中有哪些组件可以安全禁用
+            available_pipes = self.nlp.pipe_names
+            # 这些组件通常可以禁用以提高处理速度
+            pipes_to_disable = ["parser", "lemmatizer", "attribute_ruler"]
+            for pipe in pipes_to_disable:
+                if pipe in available_pipes:
+                    disable_pipes.append(pipe)
+
+            if disable_pipes:
+                self.nlp.disable_pipes(disable_pipes)
+
+            # 添加分句器
+            if "sentencizer" not in available_pipes:
+                self.nlp.add_pipe("sentencizer")
 
             # 创建短语匹配器，确保多字词准确匹配
             self.matcher = PhraseMatcher(self.nlp.vocab, attr="TEXT")
@@ -36,7 +50,6 @@ class NLPProcessor:
             self._add_custom_patterns()
 
         except Exception as e:
-            # logging.error(f"NLP模型加载失败: {str(e)}")
             print(f"NLP模型加载失败: {str(e)}")
             raise RuntimeError("NLP服务初始化失败")
 
@@ -89,16 +102,30 @@ class NLPProcessor:
             doc.ents = filtered_ents
 
             # 提取特征
-            features = {
-                "academic": self._extract_academic_features(doc),  # 提取学术特征
-                "personality": self._extract_personality_features(doc),  # 提取性格特征
-                "negations": self._detect_negations(doc)  # 检测否定表达
+            academic_features = self._extract_academic_features(doc)  # 提取学术特征
+            personality_features = self._extract_personality_features(doc)  # 提取性格特征
+
+            # 检测否定词及其修饰对象（关键优化）
+            negated_features = self._detect_negated_features(doc)
+
+            # 构建结构化响应
+            result = {
+                "positive": {
+                    # 过滤掉被否定的特征
+                    "academic": [f for f in academic_features if f not in negated_features],
+                    "personality": [f for f in personality_features if f not in negated_features]
+                },
+                "negative": {
+                    # 只保留学术类被否定特征
+                    "academic": [f for f in negated_features if f in self.academic_terms],
+                    # 只保留性格类被否定特征
+                    "personality": [f for f in negated_features if f in self.personality_terms]
+                }
             }
 
-            return features, True  # 成功返回特征和成功状态
+            return result, True  # 成功返回特征和成功状态
 
         except Exception as e:
-            # logging.error(f"NLP解析失败: {str(e)}")
             print(f"NLP解析失败: {str(e)}")
             return {"解析失败，请尝试其他表述"}, False  # 出错返回错误信息和失败状态
 
@@ -124,15 +151,58 @@ class NLPProcessor:
         )
         return list(set(personality_features))
 
-    def _detect_negations(self, doc):
+    def _detect_negated_features(self, doc):
         """
-        检测否定表达
+        检测被否定的特征（关键优化）
+        使用依存关系分析和作用范围检测准确识别被否定的特征
         """
-        negations = defaultdict(list)
+        negated_features = set()
+
+        # 第一轮：通过依存关系直接查找否定词修饰的对象
         for token in doc:
             if token.text in self.negation_words:
-                negations[token.text].append(token.i)
-        return dict(negations)
+                # 查找被否定词直接修饰的宾语/主语
+                for child in token.children:
+                    if child.dep_ in ("dobj", "nsubj", "attr"):
+                        # 检查子节点是否为特征实体
+                        if self._is_feature_entity(child):
+                            negated_features.add(child.text)
+                        # 检查子节点的子树中是否包含特征
+                        for descendant in child.subtree:
+                            if self._is_feature_entity(descendant):
+                                negated_features.add(descendant.text)
+
+        # 第二轮：通过作用范围检测（从句首到逗号）
+        for token in doc:
+            if token.text in self.negation_words:
+                # 确定否定作用范围（从句首到最近的逗号或句尾）
+                clause_end = self._find_clause_end(doc, token.i)
+
+                # 收集作用范围内的所有特征
+                for ent in doc.ents:
+                    if (ent.label_ in ["ACADEMIC", "PERSONALITY"] and
+                            token.i <= ent.start < clause_end):
+                        negated_features.add(ent.text)
+
+        return negated_features
+
+    def _is_feature_entity(self, token):
+        """
+        判断token是否为特征实体
+        """
+        # 检查token是否在特征词典中
+        return (token.text in self.academic_terms or
+                token.text in self.personality_terms)
+
+    def _find_clause_end(self, doc, start_idx):
+        """
+        确定从句边界（到逗号/句尾）
+        """
+        # 查找从起始位置开始的下一个标点符号
+        for i in range(start_idx, len(doc)):
+            if doc[i].text in {"，", ",", "。", "；", "！", "!"}:
+                return i
+        return len(doc)  # 无标点则返回文档结尾
 
 
 # 全局NLP处理器实例
