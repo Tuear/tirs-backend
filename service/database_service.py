@@ -53,7 +53,9 @@ class DatabaseService:
                     rights TEXT DEFAULT '普通管理员'
                 )''')
 
-                # 插入初始管理员账户（设计文档1.5）
+                # 插入初始管理员账户
+                # 账号：admin_super
+                # 密码：admin123
                 cursor.execute('''
                 INSERT OR IGNORE INTO admin (admin_id, admin_name, password) 
                 VALUES (?, ?, ?)
@@ -63,16 +65,35 @@ class DatabaseService:
                     hash_password('admin123')  # 需要从utils导入
                 ))
 
-            # 导师数据库初始化（待实现）
+            # 导师数据库初始化：从上到下依次为：主键、姓名、学校、学院
             elif self.db_type == 'professor':
+                # 导师基本信息表
                 cursor.execute('''
                 CREATE TABLE IF NOT EXISTS professor (
                     tutor_id TEXT PRIMARY KEY,
                     name TEXT NOT NULL,
                     university TEXT,
                     department TEXT,
-                    review_sentence TEXT,
-                    review_txt TEXT
+                )''')
+
+                # 导师评价语句表：从上到下依次为：主键、外键、评价语句、创建时间、键值关联语句
+                cursor.execute('''
+                CREATE TABLE IF NOT EXISTS review_sentences (
+                    review_id TEXT PRIMARY KEY,
+                    tutor_id TEXT NOT NULL,
+                    review_sentence TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (tutor_id) REFERENCES professor(tutor_id)
+                )''')
+
+                # 导师评价特征表：从上到下依次为：主键、外键、评价特征、创建时间、键值关联语句
+                cursor.execute('''
+                CREATE TABLE IF NOT EXISTS review_txt (
+                    feature_id TEXT PRIMARY KEY,
+                    review_id TEXT NOT NULL,
+                    review_txt TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (review_id) REFERENCES review_sentences(review_id)
                 )''')
 
 
@@ -90,7 +111,7 @@ class DatabaseService:
         :param query: SQL语句
         :param params: 参数元组
         :param fetch_one: 是否只获取一条记录
-        :return: 查询结果
+        :return: 查询结果（返回多条匹配记录）
         """
         with closing(self._get_connection()) as conn:
             cursor = conn.cursor()
@@ -121,51 +142,6 @@ class DatabaseService:
             fetch_one=True
         )
         return bool(result)
-
-    def create_user(self, user_id: str, hashed_password: str, role: str = '学生') -> None:
-        """
-        创建新用户
-        """
-        self.execute_query(
-            "INSERT INTO user (user_id, hashed_password, role) VALUES (?, ?, ?)",
-            (user_id, hashed_password, role)
-        )
-
-    def get_user(self, user_id: str) -> dict:
-        """
-        获取用户信息
-        """
-        result = self.execute_query(
-            "SELECT * FROM user WHERE user_id = ?",
-            (user_id,),
-            fetch_one=True
-        )
-        if result:
-            return {
-                'user_id': result[0],
-                'hashed_password': result[1],
-                'role': result[2],
-                'register_time': result[3]
-            }
-        return None
-
-    def get_admin(self, admin_id: str) -> dict:
-        """
-        获取管理员信息
-        """
-        result = self.execute_query(
-            "SELECT * FROM admin WHERE admin_id = ?",
-            (admin_id,),
-            fetch_one=True
-        )
-        if result:
-            return {
-                'admin_id': result[0],
-                'admin_name': result[1],
-                'password': result[2],
-                'rights': result[3]
-            }
-        return None
 
     def create_professor(self, tutor_id: str, name: str, university: str, department: str,
                          review_sentence: str, review_txt: str) -> None:

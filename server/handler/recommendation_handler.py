@@ -31,10 +31,18 @@ def get_recommendations():
 @recommend_blue.route('/submit_review', methods=['POST'])
 def submit_review():
     """
-    提交评价接口
-    """
+        评价提交接口
+        :param review_data: 包含以下字段的字典
+            - name: 导师姓名 (必填)
+            - university: 学校 (必填)
+            - department: 学院/系 (必填)
+            - academic: 学术特征 (必填)
+            - responsibility: 责任心特征 (必填)
+            - character: 人品特征 (必填)
+        :return: 提交结果
+        """
     data = request.json
-    required_fields = ['name', 'school', 'academy', 'academic', 'responsibility', 'character']
+    required_fields = ['name', 'university', 'department', 'academic', 'responsibility', 'character']
 
     if not all(field in data for field in required_fields):
         return jsonify({"error": "缺少必要参数"}), 400
@@ -50,7 +58,7 @@ def submit_review():
 def show_information():
     """
        导师信息展示接口
-       功能：根据导师ID返回基本信息及评价
+       功能：根据导师ID返回基本信息连接及评价内容
     """
     data = request.json
     tutor_id = data.get('tutor_id')
