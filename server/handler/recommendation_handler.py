@@ -28,10 +28,38 @@ def get_recommendations():
     return jsonify({"commend_result": query_result["message"]}), 200
 
 
-@recommend_blue.route('/review', methods=['POST'])
+@recommend_blue.route('/submit_review', methods=['POST'])
 def submit_review():
     """
-    提交评价接口（待开发）
-    功能：接收学生对导师的评价数据
+    提交评价接口
     """
-    pass
+    data = request.json
+    required_fields = ['name', 'school', 'academy', 'academic', 'responsibility', 'character']
+
+    if not all(field in data for field in required_fields):
+        return jsonify({"error": "缺少必要参数"}), 400
+
+    result = RecommendationService.submit_review(data)
+
+    if result["success"]:
+        return jsonify({"message": result["message"]}), 200
+    return jsonify({"error": result["message"]}), 400
+
+
+@recommend_blue.route('/show_information', methods=['POST'])
+def show_information():
+    """
+       导师信息展示接口
+       功能：根据导师ID返回基本信息及评价
+    """
+    data = request.json
+    tutor_id = data.get('tutor_id')
+
+    if not tutor_id:
+        return jsonify({"error": "缺少导师ID参数"}), 400
+
+    result = RecommendationService.show_information(tutor_id)
+
+    if result["success"]:
+        return jsonify(result["data"]), 200
+    return jsonify({"error": result["message"]}), 400

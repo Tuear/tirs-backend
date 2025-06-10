@@ -10,7 +10,6 @@ class Config:
     # 独立数据库路径
     USER_DB_PATH = 'database/user_db.sqlite'  # 用户数据库路径
     PROFESSOR_DB_PATH = 'database/professor_db.sqlite'  # 导师基本信息数据库路径
-    REVIEW_DB_PATH = 'database/review_db.sqlite'  # 评价信息数据库路径
 
     # 用户角色定义（设计文档2.4.2）
     USER_ROLES = ('学生', '管理员')
