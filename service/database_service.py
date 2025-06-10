@@ -22,8 +22,7 @@ class DatabaseService:
         """
         paths = {
             'user': Config.USER_DB_PATH,
-            'professor': Config.PROFESSOR_DB_PATH,
-            'review': Config.REVIEW_DB_PATH
+            'professor': Config.PROFESSOR_DB_PATH
         }
         return paths.get(self.db_type, Config.USER_DB_PATH)
 
@@ -66,11 +65,16 @@ class DatabaseService:
 
             # 导师数据库初始化（待实现）
             elif self.db_type == 'professor':
-                pass
+                cursor.execute('''
+                CREATE TABLE IF NOT EXISTS professor (
+                    tutor_id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    university TEXT,
+                    department TEXT,
+                    review_sentence TEXT,
+                    review_txt TEXT
+                )''')
 
-            # 评价数据库初始化（待实现）
-            elif self.db_type == 'review':
-                pass
 
             conn.commit()
 
@@ -162,3 +166,14 @@ class DatabaseService:
                 'rights': result[3]
             }
         return None
+
+    def create_professor(self, tutor_id: str, name: str, university: str, department: str,
+                         review_sentence: str, review_txt: str) -> None:
+        """
+        创建新导师记录
+        """
+        self.execute_query(
+            "INSERT INTO professor (tutor_id, name, university, department, review_sentence, review_txt) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (tutor_id, name, university, department, review_sentence, review_txt)
+        )
