@@ -6,7 +6,6 @@ import hashlib
 from config import Config
 
 
-
 # 推荐引擎类
 class RecommendationService:
     @staticmethod
@@ -80,12 +79,12 @@ class RecommendationService:
             # 计算学术特征匹配分数
             academic_matches = len(set(academic_features) & set(tutor_academic_features))
             print(f"学术特征匹配数量: {academic_matches}")
-            academic_score = (academic_matches / len(academic_features)) * Config.ACADEMIC_WEIGHT if academic_features else 0
+            academic_score = (academic_matches / len(academic_features)) * int(Config.ACADEMIC_WEIGHT) if academic_features else 0
 
             # 计算性格特征匹配分数
             personality_matches = len(set(combined_personality_features) & set(tutor_personality_features))
             print(f"性格特征匹配数量: {personality_matches}")
-            personality_score = (personality_matches / len(combined_personality_features)) * Config.PERSONALITY_WEIGHT if combined_personality_features else 0
+            personality_score = (personality_matches / len(combined_personality_features)) * int(Config.PERSONALITY_WEIGHT) if combined_personality_features else 0
 
             # 计算综合分数
             total_score = academic_score + personality_score
@@ -137,6 +136,8 @@ class RecommendationService:
         """
         # 构建评价语句
         review_sentence = f"{review_data['academic']}，{review_data['responsibility']}，{review_data['character']}"
+        if SensitiveFilter.check(review_sentence):
+            return {"success": False, "message": "评价内容不合规！请重新填写评价内容。"}
 
         # 合并特征文本（按需求可调整格式）
         review_features = f"学术特征:{review_data['academic']}|responsibility:{review_data['responsibility']}|人品:{review_data['character']}"
