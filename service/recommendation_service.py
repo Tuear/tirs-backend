@@ -3,6 +3,8 @@ from utils.sensitive_filter import SensitiveFilter
 from uuid import uuid4
 from service.database_service import DatabaseService
 import hashlib
+from config import Config
+
 
 
 # 推荐引擎类
@@ -23,21 +25,83 @@ class RecommendationService:
             return {"success": True, "message": answer}
 
     @staticmethod
-    def get_recommendations(text):
+    def get_recommendations(text, university, department):
         """
-        获取推荐结果（占位，待实现完整）
+        获取推荐结果（实现完整推荐逻辑）
+        :param text: 用户查询文本
+        :param university: 用户选择的学校
+        :param department: 用户选择的学院
         """
-        query_result = RecommendationService.parse_query(text)  # 获取语义解析结果
-        # 失败返回错误信息
+        query_result = RecommendationService.parse_query(text)
         if not query_result["success"]:
             return {"success": False, "message": query_result["message"]}
 
-        # 成功返回推荐结果
-        # """
-        # 推荐功能待开发实现，现阶段先返回语义解析结果
-        # """
+        NLP_result = query_result["message"]
+        print(f"用户输入语义解析结果为{NLP_result}")
+
+        # 获取积极特征
+        positive_features = query_result["message"]["positive"]
+        academic_features = positive_features["academic"]
+        personality_features = positive_features["personality"]
+
+        # 合并“responsibility”和“人品”到性格特征
+        combined_personality_features = personality_features
+
+        # 获取所有符合条件的导师ID
+        professor_db = DatabaseService('professor')
+        if university == "全部" and department == "全部":
+            tutor_ids = [row[0] for row in professor_db.execute_query(
+                "SELECT tutor_id FROM professor"
+            )]
         else:
-            return {"success": True, "message": query_result["message"]}
+            tutor_ids = [row[0] for row in professor_db.execute_query(
+                "SELECT tutor_id FROM professor WHERE university = ? AND department = ?",
+                (university, department)
+            )]
+
+        tutor_scores = []
+        for tutor_id in tutor_ids:
+            # 获取导师信息和特征
+            tutor_info = RecommendationService.show_information(tutor_id)
+            if not tutor_info["success"]:
+                continue
+
+            review_features = tutor_info["data"]["review_features"]
+            tutor_academic_features = []
+            tutor_personality_features = []
+            for feature_str in review_features:
+                parts = feature_str.split('|')
+                for part in parts:
+                    if part.startswith("学术特征:"):
+                        tutor_academic_features.extend(part[5:].split("，"))
+                    elif part.startswith("responsibility:") or part.startswith("人品:"):
+                        tutor_personality_features.extend(part.split(":")[1].split("，"))
+
+            # 计算学术特征匹配分数
+            academic_matches = len(set(academic_features) & set(tutor_academic_features))
+            print(f"学术特征匹配数量: {academic_matches}")
+            academic_score = (academic_matches / len(academic_features)) * Config.ACADEMIC_WEIGHT if academic_features else 0
+
+            # 计算性格特征匹配分数
+            personality_matches = len(set(combined_personality_features) & set(tutor_personality_features))
+            print(f"性格特征匹配数量: {personality_matches}")
+            personality_score = (personality_matches / len(combined_personality_features)) * Config.PERSONALITY_WEIGHT if combined_personality_features else 0
+
+            # 计算综合分数
+            total_score = academic_score + personality_score
+
+            # 将匹配度分数添加到导师信息中
+            tutor_data = tutor_info["data"]
+            tutor_data["match_score"] = total_score
+            tutor_scores.append((tutor_data, total_score))
+
+        # 按综合分数从高到低排序
+        tutor_scores.sort(key=lambda x: x[1], reverse=True)
+
+        # 取前5个导师
+        top_5_tutors = [tutor[0] for tutor in tutor_scores[:5]]
+
+        return {"success": True, "message": top_5_tutors}
 
     @staticmethod
     def generate_professor_id(name, university, department):
@@ -56,7 +120,7 @@ class RecommendationService:
         review_sentence = f"{review_data['academic']}，{review_data['responsibility']}，{review_data['character']}"
 
         # 合并特征文本（按需求可调整格式）
-        review_features = f"学术特征:{review_data['academic']}|责任心:{review_data['responsibility']}|人品:{review_data['character']}"
+        review_features = f"学术特征:{review_data['academic']}|responsibility:{review_data['responsibility']}|人品:{review_data['character']}"
 
         # 调用本类方法生成唯导师一ID
         tutor_id = RecommendationService.generate_professor_id(
