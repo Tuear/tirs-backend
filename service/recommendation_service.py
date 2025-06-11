@@ -232,3 +232,47 @@ class RecommendationService:
 
         except Exception as e:
             return {"success": False, "message": f"查询失败: {str(e)}"}
+
+    @staticmethod
+    def get_all_reviews():
+        """获取所有导师评价信息"""
+        professor_db = DatabaseService('professor')
+        try:
+            # 获取所有评价语句及关联特征
+            reviews = professor_db.execute_query('''
+                SELECT s.sentence_id, p.tutor_id, p.name, p.university, p.department, 
+                       s.review_sentence, t.review_features
+                FROM review_sentences s
+                JOIN professor p ON s.tutor_id = p.tutor_id
+                LEFT JOIN review_features t ON s.sentence_id = t.sentence_id
+            ''')
+
+            return {
+                "success": True,
+                "data": [{
+                    "sentence_id": row[0],
+                    "tutor_id": row[1],
+                    "name": row[2],
+                    "university": row[3],
+                    "department": row[4],
+                    "review_sentence": row[5],
+                    "review_features": row[6]
+                } for row in reviews]
+            }
+        except Exception as e:
+            return {"success": False, "message": f"查询失败: {str(e)}"}
+
+    @staticmethod
+    def delete_review(sentence_id):
+        professor_db = DatabaseService('professor')
+        try:
+            professor_db.execute_update(sentence_id)
+            # professor_db.execute_update(
+            #     "DELETE FROM review_sentences WHERE sentence_id = ?",
+            #     (sentence_id,)
+            # )
+            # 使用新的写操作方法
+
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "message": f"删除失败: {str(e)}"}
