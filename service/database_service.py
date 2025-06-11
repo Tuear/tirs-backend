@@ -87,10 +87,10 @@ class DatabaseService:
 
                 # 导师评价特征表：从上到下依次为：主键、外键、评价特征、键值关联语句
                 cursor.execute('''
-                CREATE TABLE IF NOT EXISTS review_txt (
+                CREATE TABLE IF NOT EXISTS review_features (
                     txt_id TEXT PRIMARY KEY,
                     sentence_id TEXT NOT NULL,
-                    review_txt TEXT NOT NULL,
+                    review_features TEXT NOT NULL,
                     FOREIGN KEY (sentence_id) REFERENCES review_sentences(sentence_id)
                 )''')
 
@@ -178,15 +178,15 @@ class DatabaseService:
             (sentence_id, tutor_id, review_sentence)
         )
 
-    def create_review_txt(self, txt_id: str, sentence_id: str, review_txt: str) -> None:
+    def create_review_features(self, txt_id: str, sentence_id: str, review_features: str) -> None:
         """
         创建评价特征记录
         """
         self.execute_query(
             """
-            INSERT INTO review_txt 
-            (txt_id, sentence_id, review_txt)
+            INSERT INTO review_features 
+            (txt_id, sentence_id, review_features)
             VALUES (?, ?, ?)
             """,
-            (txt_id, sentence_id, review_txt)
+            (txt_id, sentence_id, review_features)
         )

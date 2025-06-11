@@ -56,7 +56,7 @@ class RecommendationService:
         review_sentence = f"{review_data['academic']}，{review_data['responsibility']}，{review_data['character']}"
 
         # 合并特征文本（按需求可调整格式）
-        review_txt = f"学术特征:{review_data['academic']}|责任心:{review_data['responsibility']}|人品:{review_data['character']}"
+        review_features = f"学术特征:{review_data['academic']}|责任心:{review_data['responsibility']}|人品:{review_data['character']}"
 
         # 调用本类方法生成唯导师一ID
         tutor_id = RecommendationService.generate_professor_id(
@@ -90,8 +90,8 @@ class RecommendationService:
             # 存储review_sentence到review_sentences表
             professor_db.create_review_sentence(sentence_id, tutor_id, review_sentence)
 
-            # 存储review_txt到review_txt表
-            professor_db.create_review_txt(txt_id, sentence_id, review_txt)
+            # 存储review_features到review_features表
+            professor_db.create_review_features(txt_id, sentence_id, review_features)
 
             return {"success": True, "message": "评价提交成功"}
 
@@ -125,6 +125,15 @@ class RecommendationService:
                 (tutor_id,),
             )
 
+            # 3. 查询导师的所有评价特征（如果需要）
+            review_features = professor_db.execute_query(
+                "SELECT t.review_features "
+                "FROM review_features t "
+                "JOIN review_sentences s ON t.sentence_id = s.sentence_id "
+                "WHERE s.tutor_id = ?",
+                (tutor_id,),
+            )
+
             # 3. 构造返回数据结构
             return {
                 "success": True,
@@ -133,7 +142,8 @@ class RecommendationService:
                     "name": basic_info[1],
                     "university": basic_info[2],
                     "department": basic_info[3],
-                    "review_sentences": [s[0] for s in review_sentences] if review_sentences else []
+                    "review_sentences": [s[0] for s in review_sentences] if review_sentences else [],
+                    "review_features": [f[0] for f in review_features] if review_features else []
                 }
             }
 
