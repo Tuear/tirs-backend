@@ -1,3 +1,5 @@
+import os
+
 # 配置类，用于存储全局变量
 class Config:
     DEBUG = True
@@ -7,9 +9,10 @@ class Config:
     # 密码加密参数
     BCRYPT_LOG_ROUNDS = 12
 
-    # 独立数据库路径
-    USER_DB_PATH = 'database/user_db.sqlite'  # 用户数据库路径
-    PROFESSOR_DB_PATH = 'database/professor_db.sqlite'  # 导师基本信息数据库路径
+    # 独立数据库路径（使用绝对路径，避免路径问题）
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # 获取项目根目录绝对路径
+    USER_DB_PATH = os.path.join(BASE_DIR, 'database/user_db.sqlite')  # 用户数据库路径
+    PROFESSOR_DB_PATH = os.path.join(BASE_DIR, 'database/professor_db.sqlite')  # 导师数据库路径
 
     # 用户角色定义（设计文档2.4.2）
     USER_ROLES = ('学生', '管理员')
