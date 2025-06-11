@@ -12,14 +12,20 @@ def get_recommendations():
     功能：接收用户输入的查询文本，解析需求并返回推荐结果
     """
     data = request.json
-    query = data.get('query', '').strip()
+    query = data.get('query', '').strip()  # 查询语句
+    university = data.get('university', '').strip()  # 学校
+    department = data.get('department', '').strip()  # 学院/系
 
     # 检查输入是否为空
     if not query:
         return jsonify({"error": "请输入查询内容"}), 400
+    if not university:
+        return jsonify({"error": "请输入学校"}), 400
+    if not department:
+        return jsonify({"error": "请输入学院/系"}), 400
 
     # 调用推荐服务获取结果（包含解析和推荐两个步骤）
-    query_result = RecommendationService.get_recommendations(query)
+    query_result = RecommendationService.get_recommendations(query, university, department)
     # 失败返回错误信息
     if not query_result["success"]:
         return jsonify({"error": query_result["message"]}), 400
