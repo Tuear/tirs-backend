@@ -136,6 +136,8 @@ class RecommendationService:
         """
         # 构建评价语句
         review_sentence = f"{review_data['academic']}，{review_data['responsibility']}，{review_data['character']}"
+
+        # 检查评价内容是否合规
         if SensitiveFilter.check(review_sentence):
             return {"success": False, "message": "评价内容不合规！请重新填写评价内容。"}
 
@@ -166,7 +168,8 @@ class RecommendationService:
             if not existing_professor:
                 # 若无该导师记录则创建新导师记录
                 professor_db.create_professor(
-                    tutor_id, review_data['name'],
+                    tutor_id,
+                    review_data['name'],
                     review_data['university'],
                     review_data['department']
                 )
