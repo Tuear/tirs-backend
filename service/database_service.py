@@ -73,27 +73,25 @@ class DatabaseService:
                     tutor_id TEXT PRIMARY KEY,
                     name TEXT NOT NULL,
                     university TEXT,
-                    department TEXT,
+                    department TEXT
                 )''')
 
-                # 导师评价语句表：从上到下依次为：主键、外键、评价语句、创建时间、键值关联语句
+                # 导师评价语句表：从上到下依次为：主键、外键、评价语句、键值关联语句
                 cursor.execute('''
                 CREATE TABLE IF NOT EXISTS review_sentences (
-                    review_id TEXT PRIMARY KEY,
+                    sentence_id TEXT PRIMARY KEY,
                     tutor_id TEXT NOT NULL,
                     review_sentence TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (tutor_id) REFERENCES professor(tutor_id)
                 )''')
 
-                # 导师评价特征表：从上到下依次为：主键、外键、评价特征、创建时间、键值关联语句
+                # 导师评价特征表：从上到下依次为：主键、外键、评价特征、键值关联语句
                 cursor.execute('''
                 CREATE TABLE IF NOT EXISTS review_txt (
-                    feature_id TEXT PRIMARY KEY,
-                    review_id TEXT NOT NULL,
+                    txt_id TEXT PRIMARY KEY,
+                    sentence_id TEXT NOT NULL,
                     review_txt TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (review_id) REFERENCES review_sentences(review_id)
+                    FOREIGN KEY (sentence_id) REFERENCES review_sentences(sentence_id)
                 )''')
 
 
@@ -107,11 +105,11 @@ class DatabaseService:
 
     def execute_query(self, query: str, params: tuple = (), fetch_one: bool = False):
         """
-        执行SQL查询
+        执行SQL语句，支持查询和插入操作
         :param query: SQL语句
         :param params: 参数元组
         :param fetch_one: 是否只获取一条记录
-        :return: 查询结果（返回多条匹配记录）
+        :return: 若执行查询语句则返回查询结果（返回单挑或多条匹配记录）
         """
         with closing(self._get_connection()) as conn:
             cursor = conn.cursor()
@@ -143,13 +141,52 @@ class DatabaseService:
         )
         return bool(result)
 
-    def create_professor(self, tutor_id: str, name: str, university: str, department: str,
-                         review_sentence: str, review_txt: str) -> None:
+    def professor_exists(self, tutor_id: str) -> bool:
+        """
+        检查导师是否存在
+        """
+        result = self.execute_query(
+            "SELECT 1 FROM professor WHERE tutor_id =?",
+            (tutor_id,),
+            fetch_one=True
+        )
+        return bool(result)
+
+    def create_professor(self, tutor_id: str, name: str, university: str, department: str) -> None:
         """
         创建新导师记录
         """
         self.execute_query(
-            "INSERT INTO professor (tutor_id, name, university, department, review_sentence, review_txt) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (tutor_id, name, university, department, review_sentence, review_txt)
+     """
+            INSERT INTO professor 
+            (tutor_id, name, university, department)
+            VALUES (?, ?, ?, ?)
+            """,
+            (tutor_id, name, university, department)
+        )
+
+    def create_review_sentence(self, sentence_id: str, tutor_id: str, review_sentence: str) -> None:
+        """
+        创建评价语句记录
+        """
+        self.execute_query(
+            """
+            INSERT INTO review_sentences 
+            (sentence_id, tutor_id, review_sentence)
+            VALUES (?, ?, ?)
+            """,
+            (sentence_id, tutor_id, review_sentence)
+        )
+
+    def create_review_txt(self, txt_id: str, sentence_id: str, review_txt: str) -> None:
+        """
+        创建评价特征记录
+        """
+        self.execute_query(
+            """
+            INSERT INTO review_txt 
+            (txt_id, sentence_id, review_txt)
+            VALUES (?, ?, ?)
+            """,
+            (txt_id, sentence_id, review_txt)
         )
