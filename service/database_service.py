@@ -190,3 +190,19 @@ class DatabaseService:
             """,
             (txt_id, sentence_id, review_features)
         )
+
+    def execute_update(self, sentence_id) -> None:
+        """
+        执行写操作并提交事务
+        """
+        # 删除评价语句记录
+        self.execute_query(
+            """DELETE FROM review_sentences WHERE sentence_id = ?""",
+            (sentence_id,)
+        )
+
+        # 删除评价特征记录
+        self.execute_query(
+            """DELETE FROM review_features WHERE sentence_id =?""",
+            (sentence_id,)
+        )

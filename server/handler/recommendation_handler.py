@@ -43,7 +43,7 @@ def submit_review():
             - university: 学校 (必填)
             - department: 学院/系 (必填)
             - academic: 学术特征 (必填)
-            - responsibility: 责任心特征 (必填)
+            - responsibility: responsibility特征 (必填)
             - character: 人品特征 (必填)
         :return: 提交结果
         """
@@ -77,3 +77,25 @@ def show_information():
     if result["success"]:
         return jsonify(result["data"]), 200
     return jsonify({"error": result["message"]}), 400
+
+
+@recommend_blue.route('/get_all_reviews', methods=['GET'])
+def get_all_reviews():
+    result = RecommendationService.get_all_reviews()
+    if not result["success"]:
+        return jsonify({"error": result["message"]}), 400
+    return jsonify(result)
+
+
+@recommend_blue.route('/delete_review', methods=['POST'])
+def delete_review():
+    data = request.json
+    sentence_id = data.get('sentence_id')
+    # 添加参数校验
+    if not sentence_id:
+        return jsonify({"error": "缺少评价ID参数"}), 400
+
+    result = RecommendationService.delete_review(sentence_id)
+    if not result["success"]:
+        return jsonify({"error": result.get("message", "删除失败")}), 400
+    return jsonify({"success": True})
