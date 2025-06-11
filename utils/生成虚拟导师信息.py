@@ -173,8 +173,8 @@ def main():
     print("开始生成并提交导师评价数据...")
     successful_count = 0
 
-    for i in range(1, 201):
-        print(f"\n生成第 {i}/200 条数据...")
+    for i in range(1, 501):
+        print(f"\n生成第 {i}/500 条数据...")
         review_data = generate_review_data()
         print(f"导师: {review_data['name']}")
         print(f"学校: {review_data['university']} - 学院: {review_data['department']}")
@@ -189,9 +189,9 @@ def main():
         # 添加短暂延迟防止请求过快
         time.sleep(0.5)
 
-    print("\n" + "=" * 50)
-    print(f"数据提交完成! 成功: {successful_count}/50")
-    print("=" * 50)
+    print("\n" + "=" * 500)
+    print(f"数据提交完成! 成功: {successful_count}/500")
+    print("=" * 500)
 
 
 if __name__ == "__main__":

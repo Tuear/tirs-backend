@@ -101,7 +101,26 @@ class RecommendationService:
         # 取前5个导师
         top_5_tutors = [tutor[0] for tutor in tutor_scores[:5]]
 
-        return {"success": True, "message": top_5_tutors}
+        # 处理0分导师数据结构
+        processed_tutors = []
+        for tutor in top_5_tutors:
+            if tutor["match_score"] == 0:
+                # 创建带提示信息的空数据结构
+                processed_tutors.append({
+                    "department": "",
+                    "match_score": 0,
+                    "name": "",
+                    "review_features": [],
+                    "review_sentences": [],
+                    "tutor_id": "",
+                    "university": "",
+                    "notice": "以下导师不符合您的要求，可以试试重新调整要求。"
+                })
+            else:
+                processed_tutors.append(tutor)
+
+        return {"success": True, "message": processed_tutors}
+
 
     @staticmethod
     def generate_professor_id(name, university, department):
