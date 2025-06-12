@@ -155,19 +155,53 @@ class DatabaseService:
         """
         获取单个用户信息
         """
-        result = self.execute_query(
-            "SELECT * FROM user WHERE user_id = ?",
-            (user_id,),
-            fetch_one=True
-        )
-        if result:
-            return {
-                'user_id': result[0],
-                'hashed_password': result[1],
-                'role': result[2],
-                'review_allowed': result[3]
+        try:
+            result = self.execute_query(
+                "SELECT * FROM user WHERE user_id = ?",
+                (user_id,),
+                fetch_one=True
+            )
+            if result:
+                return {
+                    'user_id': result[0],
+                    'hashed_password': result[1],
+                    'role': result[2],
+                    'review_allowed': result[3]
+                }
+            return None
+
+        except Exception as e:
+            return {"success": False, "message": f"获取失败: {str(e)}"}
+
+    def get_all_users(self) -> dict:
+        """
+        获取所有用户信息
+        """
+        try:
+            # 获取所有用户信息
+            users = self.execute_query('''
+                SELECT user_id, role, review_allowed
+                FROM user
+            ''')
+            # 定义字段索引映射
+            FIELD_MAPPING = {
+                'user_id': 0,
+                'role': 1,
+                'review_allowed': 2
             }
-        return None
+
+            return {
+                "success": True,
+                "data": [{
+                    "user_id": row[FIELD_MAPPING['user_id']],
+                    "role": row[FIELD_MAPPING['role']],
+                    "review_allowed": row[FIELD_MAPPING['review_allowed']],
+                } for row in users]
+            }
+
+        except Exception as e:
+            return {"success": False, "message": f"获取失败: {str(e)}"}
+
 
     def get_admin(self, admin_id: str) -> dict:
         """
