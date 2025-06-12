@@ -41,7 +41,7 @@ class DatabaseService:
                     user_id TEXT PRIMARY KEY,
                     hashed_password TEXT NOT NULL,
                     role TEXT CHECK(role IN ('学生', '管理员')) DEFAULT '学生',
-                    review_allowed TEXT DEFAULT 'True'  -- 新增权限字段（1为允许，0为禁止）
+                    review_allowed TEXT DEFAULT 'True'
                 )''')
 
                 # 管理员表
@@ -153,7 +153,7 @@ class DatabaseService:
 
     def get_user(self, user_id: str) -> dict:
         """
-        获取用户信息
+        获取单个用户信息
         """
         result = self.execute_query(
             "SELECT * FROM user WHERE user_id = ?",
@@ -165,7 +165,7 @@ class DatabaseService:
                 'user_id': result[0],
                 'hashed_password': result[1],
                 'role': result[2],
-                'register_time': result[3]
+                'review_allowed': result[3]
             }
         return None
 
@@ -237,9 +237,9 @@ class DatabaseService:
             (feature_id, sentence_id, review_features)
         )
 
-    def execute_update(self, sentence_id) -> None:
+    def delete_review(self, sentence_id) -> None:
         """
-        执行写操作并提交事务
+        删除评价记录
         """
         # 删除评价语句记录
         self.execute_query(
@@ -251,4 +251,14 @@ class DatabaseService:
         self.execute_query(
             """DELETE FROM review_features WHERE sentence_id =?""",
             (sentence_id,)
+        )
+
+    def update_review_permission(self,  target_user_id: str, enable: str) -> None:
+        """
+        更新用户评价权限
+        """
+        self.execute_query(
+            """UPDATE user SET review_allowed = ? WHERE user_id = ?
+                """,
+            (enable, target_user_id)
         )

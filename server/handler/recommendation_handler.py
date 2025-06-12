@@ -1,11 +1,10 @@
 """
 核心推荐引擎模块接口，提供导师推荐结果展示，导师详细信息查看功能
 """
-
-
 from flask import Blueprint, request, jsonify
 from service.recommendation_service import RecommendationService
 from flask import session
+from service.database_service import DatabaseService
 
 # 创建推荐引擎蓝图
 recommend_blue = Blueprint('recommendation', __name__, url_prefix='/recommend')
@@ -46,11 +45,11 @@ def submit_review():
     user_id = session.get('user_id')
 
     # 新增权限校验
-    from service.database_service import DatabaseService
     user_db = DatabaseService('user')
     user_info = user_db.get_user(user_id)
 
-    if not user_info.get('review_allowed', 'True'):  # 默认允许提交
+    review_allower = user_info.get('review_allowed', 'True')  # 默认允许提交
+    if review_allower == 'False':
         return jsonify({"error": "你已暂时被限制提交评价"}), 403
 
     # 原有参数校验保持不变
@@ -95,6 +94,19 @@ def get_all_reviews():
     if not result["success"]:
         return jsonify({"error": result["message"]}), 400
     return jsonify(result)
+
+@recommend_blue.route('/get_all_users', methods=['GET'])
+def get_all_users():
+    """
+    获取所有用户接口
+    功能：返回所有用户的列表，包括用户ID、姓名、角色等
+    :return: 包含所有用户的列表
+    """
+    result = RecommendationService.get_all_users()
+    if not result["success"]:
+        return jsonify({"error": result["message"]}), 400
+    return jsonify(result)
+
 
 
 @recommend_blue.route('/delete_review', methods=['POST'])

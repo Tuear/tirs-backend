@@ -239,7 +239,9 @@ class RecommendationService:
 
     @staticmethod
     def get_all_reviews():
-        """获取所有导师评价信息"""
+        """
+        获取所有导师评价信息
+        """
         professor_db = DatabaseService('professor')
         try:
             # 获取所有评价语句及关联特征
@@ -278,13 +280,48 @@ class RecommendationService:
             }
 
         except Exception as e:
-            return {"success": False, "message": f"查询失败: {str(e)}"}
+            return {"success": False, "message": f"获取失败: {str(e)}"}
+
+    @staticmethod
+    def get_all_users():
+        """
+        获取所有用户信息
+        """
+        user_db = DatabaseService('user')
+        try:
+            # 获取所有用户信息
+            users = user_db.execute_query('''
+                SELECT user_id, role, review_allowed
+                FROM user
+            ''')
+            # 定义字段索引映射
+            FIELD_MAPPING = {
+                'user_id': 0,
+                'role': 1,
+                'review_allowed': 2
+            }
+
+            return {
+                "success": True,
+                "data": [{
+                    "user_id": row[FIELD_MAPPING['user_id']],
+                    "role": row[FIELD_MAPPING['role']],
+                    "review_allowed": row[FIELD_MAPPING['review_allowed']],
+                } for row in users]
+            }
+
+        except Exception as e:
+            return {"success": False, "message": f"获取失败: {str(e)}"}
+
 
     @staticmethod
     def delete_review(sentence_id):
+        """
+        删除评价语句
+        """
         professor_db = DatabaseService('professor')
         try:
-            professor_db.execute_update(sentence_id)
+            professor_db.delete_review(sentence_id)
             return {"success": True}
         except Exception as e:
             return {"success": False, "message": f"删除失败: {str(e)}"}
@@ -303,13 +340,9 @@ class RecommendationService:
             user_db = DatabaseService('user')
 
             # 更新用户权限状态
-            user_db.execute_query(
-            """UPDATE user SET review_allowed = ? FROM user WHERE user_id = ?
-                """,
-                ('True' if enable == 'True' else 'False', target_user_id)
-            )
+            user_db.update_review_permission(target_user_id, enable)
 
-            return {"success": True, "message": f"已成功{'启用' if enable else '禁用'}用户评价权限"}
+            return {"success": True, "message": f"已成功{'启用' if enable == 'True' else '禁用'}用户评价权限"}
 
         except Exception as e:
             return {"success": False, "message": f"权限更新失败: {str(e)}"}
