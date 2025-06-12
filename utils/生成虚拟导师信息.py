@@ -1,13 +1,15 @@
-import requests
+# 移除数据库相关导入
 import random
-import time
+from service.database_service import DatabaseService
+from service.review_service import ReviewService
+from uuid import uuid4
 from faker import Faker
+import hashlib
 
-# 初始化 Faker 生成中文虚拟数据
 fake = Faker('zh_CN')
 
-# 定义 API 端点
-API_URL = "http://127.0.0.1:5000/recommend/submit_review"  # 请根据实际API地址修改
+# 固定用户ID池
+USER_IDS = ["柒尾", "杨梅", "舒凡", "BR"]
 
 # 定义大学列表
 universities = [
@@ -89,7 +91,6 @@ academic_traits = [
         "自由高", "方向多", "选题活", "兴趣重", "点通"
 ]
 
-# 责任心特征描述
 responsibility_traits = [
     # 基本性格特征
         "耐心", "严格", "轻松", "负责任", "友好", "压力大", "氛围", "团队", "指导", "沟通",
@@ -110,7 +111,7 @@ responsibility_traits = [
         # 团队文化
         "平等", "包容", "多元", "创新", "协作", "互助", "积极", "向上", "学习型", "研究型",
         "高效率", "快节奏", "慢节奏", "成果导向", "过程导向",
-        # 新增责任心描述
+        # 新增responsibility描述
         "主动关心学生", "及时解决问题", "承诺必兑现", "工作一丝不苟", "跟进学生进展",
         "保护学生权益", "维护学术诚信", "尊重学生时间", "危机处理能力强", "支持学生决定",
         # 新增人品特征描述
@@ -124,11 +125,11 @@ responsibility_traits = [
 # 人品特征描述
 character_traits = [
         # 新增学生支持描述
-        "职业发展指导", "实习推荐积极", "就业资源丰富", "深造支持有力", "心理支持到位",
+        "职业发展指导", "实习推荐积极", "就业资源丰富", "深造支持有力", "生活支持到位",
         "生活关怀细致", "困难时期陪伴", "资源分配合理", "机会提供公平", "人脉资源分享",
         # 新增沟通风格描述
         "沟通高效直接", "倾听耐心细致", "表达清晰明确", "反馈建设性强", "讨论氛围开放",
-        "尊重不同意见", "批评方式得当", "鼓励自由表达", "定期一对一交流", "线上线下结合",
+        "尊重不同意见", "批评方式得当", "鼓励自由表达", "定期一对一交流", "线下交流",
         # 新增团队氛围描述
         "团队凝聚力强", "互助氛围浓厚", "学术氛围自由", "创新氛围浓厚", "竞争氛围健康",
         "跨学科交流多", "师生关系平等", "经验传承良好", "新成员融入快", "成果共享公平",
@@ -136,7 +137,7 @@ character_traits = [
         "护学生", "不压榨", "不抢功", "不画饼", "说到做",
         "好商量", "接地气", "回复快", "不拖堂", "反馈快",
         "不消失", "放养型", "管得松", "不压力", "心态好",
-        "开玩笑", "请客多", "福利多", "关心人", "帮解决",
+        "打开", "请客多", "福利多", "关心人", "帮解决",
         "帮找对象", "氛围好", "师兄好", "师弟好", "像家庭",
         "不抢一作", "署名公", "推荐强", "帮工作", "实习强",
         "熬夜陪", "不骂人", "不甩锅", "不施压", "真帮忙"
@@ -144,56 +145,47 @@ character_traits = [
 
 
 def generate_review_data():
-    """生成单条导师评价数据"""
-    return {
-        "name": fake.name(),  # 生成中文姓名
+    """生成单条导师评价数据（新增tutor_id生成）"""
+    data = {
+        "name": fake.name(),
         "university": random.choice(universities),
         "department": random.choice(departments),
         "academic": random.choice(academic_traits),
         "responsibility": random.choice(responsibility_traits),
-        "character": random.choice(character_traits)
+        "character": random.choice(character_traits),
+        "user_id": random.choice(USER_IDS)
     }
-
-
-def submit_review(data):
-    """提交评价数据到API"""
-    try:
-        response = requests.post(API_URL, json=data)
-        if response.status_code == 200:
-            print(f"✅ 提交成功: {data['name']} - {response.json()['message']}")
-        else:
-            print(f"❌ 提交失败: {data['name']} - 状态码: {response.status_code}, 错误: {response.text}")
-        return response
-    except requests.exceptions.RequestException as e:
-        print(f"🚨 请求异常: {data['name']} - {str(e)}")
-        return None
-
+    # 生成唯一导师ID（与推荐系统逻辑一致）
+    # 修复后的代码：
+    identifier = f"{data['name']}_{data['university']}_{data['department']}"
+    data["tutor_id"] = f"tutor_{hashlib.sha256(identifier.encode()).hexdigest()}"
+    return data
 
 def main():
     print("开始生成并提交导师评价数据...")
     successful_count = 0
+    professor_db = DatabaseService('professor')
 
     for i in range(1, 501):
-        print(f"\n生成第 {i}/500 条数据...")
         review_data = generate_review_data()
-        print(f"导师: {review_data['name']}")
-        print(f"学校: {review_data['university']} - 学院: {review_data['department']}")
-        print(f"学术: {review_data['academic']}")
-        print(f"责任: {review_data['responsibility']}")
-        print(f"人品: {review_data['character']}")
 
-        response = submit_review(review_data)
-        if response and response.status_code == 200:
+        # 直接调用ReviewService写入数据库
+        result = ReviewService.submit_review({
+            'name': review_data['name'],
+            'university': review_data['university'],
+            'department': review_data['department'],
+            'academic': review_data['academic'],
+            'responsibility': review_data['responsibility'],
+            'character': review_data['character']
+        }, review_data['user_id'])
+
+        if result["success"]:
             successful_count += 1
+            print(f"✅ 提交成功: {review_data['name']}")
+        else:
+            print(f"❌ 提交失败: {review_data['name']}")
 
-        # 添加短暂延迟防止请求过快
-        time.sleep(0.5)
-
-    print("\n" + "=" * 500)
-    print(f"数据提交完成! 成功: {successful_count}/500")
-    print("=" * 500)
-
+    print(f"\n完成！成功提交 {successful_count}/500 条数据")
 
 if __name__ == "__main__":
-    # 安装必要的依赖: pip install Faker requests
     main()

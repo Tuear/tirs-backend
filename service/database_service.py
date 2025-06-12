@@ -41,7 +41,7 @@ class DatabaseService:
                     user_id TEXT PRIMARY KEY,
                     hashed_password TEXT NOT NULL,
                     role TEXT CHECK(role IN ('学生', '管理员')) DEFAULT '学生',
-                    review_allowed TEXT DEFAULT 'True' 
+                    review_allowed TEXT DEFAULT 'True'
                 )''')
 
                 # 管理员表
@@ -152,19 +152,56 @@ class DatabaseService:
         )
 
     def get_user(self, user_id: str) -> dict:
-        result = self.execute_query(
-            "SELECT * FROM user WHERE user_id = ?",
-            (user_id,),
-            fetch_one=True
-        )
-        if result:
-            return {
-                'user_id': result[0],
-                'hashed_password': result[1],
-                'role': result[2],
-                'review_allowed': result[3]  # 修复字段映射错误
+        """
+        获取单个用户信息
+        """
+        try:
+            result = self.execute_query(
+                "SELECT * FROM user WHERE user_id = ?",
+                (user_id,),
+                fetch_one=True
+            )
+            if result:
+                return {
+                    'user_id': result[0],
+                    'hashed_password': result[1],
+                    'role': result[2],
+                    'review_allowed': result[3]
+                }
+            return None
+
+        except Exception as e:
+            return {"success": False, "message": f"获取失败: {str(e)}"}
+
+    def get_all_users(self) -> dict:
+        """
+        获取所有用户信息
+        """
+        try:
+            # 获取所有用户信息
+            users = self.execute_query('''
+                SELECT user_id, role, review_allowed
+                FROM user
+            ''')
+            # 定义字段索引映射
+            FIELD_MAPPING = {
+                'user_id': 0,
+                'role': 1,
+                'review_allowed': 2
             }
-        return None
+
+            return {
+                "success": True,
+                "data": [{
+                    "user_id": row[FIELD_MAPPING['user_id']],
+                    "role": row[FIELD_MAPPING['role']],
+                    "review_allowed": row[FIELD_MAPPING['review_allowed']],
+                } for row in users]
+            }
+
+        except Exception as e:
+            return {"success": False, "message": f"获取失败: {str(e)}"}
+
 
     def get_admin(self, admin_id: str) -> dict:
         """
@@ -234,9 +271,9 @@ class DatabaseService:
             (feature_id, sentence_id, review_features)
         )
 
-    def execute_update(self, sentence_id) -> None:
+    def delete_review(self, sentence_id) -> None:
         """
-        执行写操作并提交事务
+        删除评价记录
         """
         # 删除评价语句记录
         self.execute_query(
@@ -248,4 +285,14 @@ class DatabaseService:
         self.execute_query(
             """DELETE FROM review_features WHERE sentence_id =?""",
             (sentence_id,)
+        )
+
+    def update_review_permission(self,  target_user_id: str, enable: str) -> None:
+        """
+        更新用户评价权限
+        """
+        self.execute_query(
+            """UPDATE user SET review_allowed = ? WHERE user_id = ?
+                """,
+            (enable, target_user_id)
         )
