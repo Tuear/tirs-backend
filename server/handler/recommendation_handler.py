@@ -45,12 +45,13 @@ def submit_review():
     data = request.json
     user_id = session.get('user_id')
 
-    # 新增权限校验
+    # 权限校验
     from service.database_service import DatabaseService
     user_db = DatabaseService('user')
     user_info = user_db.get_user(user_id)
 
-    if not user_info.get('review_allowed', 'True'):  # 默认允许提交
+    # 检查权限字段（修复后这里会获取正确的review_allowed值）
+    if user_info.get('review_allowed', 'True') != 'True':
         return jsonify({"error": "你已暂时被限制提交评价"}), 403
 
     # 原有参数校验保持不变
@@ -130,13 +131,14 @@ def toggle_review_permission():
 
     data = request.json
     required_fields = ['target_user', 'enable']
+
     if not all(field in data for field in required_fields):
         return jsonify({"error": "缺少必要参数"}), 400
 
     try:
         result = RecommendationService.toggle_review_permission(
             target_user_id=data['target_user'],
-            enable=data.get('enable', 'True')
+            enable=data.get('enable')
         )
 
         if result["success"]:

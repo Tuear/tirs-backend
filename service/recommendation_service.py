@@ -304,12 +304,11 @@ class RecommendationService:
 
             # 更新用户权限状态
             user_db.execute_query(
-            """UPDATE user SET review_allowed = ? FROM user WHERE user_id = ?
-                """,
+                """UPDATE user SET review_allowed = ? WHERE user_id = ?""",
                 ('True' if enable == 'True' else 'False', target_user_id)
             )
 
-            return {"success": True, "message": f"已成功{'启用' if enable else '禁用'}用户评价权限"}
+            return {"success": True, "message": f"已成功{'启用' if enable == 'True' else '禁用'}用户评价权限"}
 
         except Exception as e:
             return {"success": False, "message": f"权限更新失败: {str(e)}"}

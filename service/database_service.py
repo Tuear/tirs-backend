@@ -41,7 +41,7 @@ class DatabaseService:
                     user_id TEXT PRIMARY KEY,
                     hashed_password TEXT NOT NULL,
                     role TEXT CHECK(role IN ('学生', '管理员')) DEFAULT '学生',
-                    review_allowed TEXT DEFAULT 'True'  -- 新增权限字段（1为允许，0为禁止）
+                    review_allowed TEXT DEFAULT 'True' 
                 )''')
 
                 # 管理员表
@@ -152,9 +152,6 @@ class DatabaseService:
         )
 
     def get_user(self, user_id: str) -> dict:
-        """
-        获取用户信息
-        """
         result = self.execute_query(
             "SELECT * FROM user WHERE user_id = ?",
             (user_id,),
@@ -165,7 +162,7 @@ class DatabaseService:
                 'user_id': result[0],
                 'hashed_password': result[1],
                 'role': result[2],
-                'register_time': result[3]
+                'review_allowed': result[3]  # 修复字段映射错误
             }
         return None
 
