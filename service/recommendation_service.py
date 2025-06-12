@@ -288,3 +288,28 @@ class RecommendationService:
             return {"success": True}
         except Exception as e:
             return {"success": False, "message": f"删除失败: {str(e)}"}
+
+
+    # 在 RecommendationService 类中添加以下方法
+
+    @staticmethod
+    def toggle_review_permission(target_user_id: str, enable: str):
+        """
+        切换用户评价权限（管理员功能）
+        :param target_user_id: 目标用户ID
+        :param enable: True启用权限/False禁用权限
+        """
+        try:
+            user_db = DatabaseService('user')
+
+            # 更新用户权限状态
+            user_db.execute_query(
+            """UPDATE user SET review_allowed = ? FROM user WHERE user_id = ?
+                """,
+                ('True' if enable == 'True' else 'False', target_user_id)
+            )
+
+            return {"success": True, "message": f"已成功{'启用' if enable else '禁用'}用户评价权限"}
+
+        except Exception as e:
+            return {"success": False, "message": f"权限更新失败: {str(e)}"}

@@ -42,21 +42,19 @@ def get_recommendations():
 
 @recommend_blue.route('/submit_review', methods=['POST'])
 def submit_review():
-    """
-        评价提交接口
-        :param review_data: 包含以下字段的字典
-            - name: 导师姓名 (必填)
-            - university: 学校 (必填)
-            - department: 学院/系 (必填)
-            - academic: 学术特征 (必填)
-            - responsibility: responsibility特征 (必填)
-            - character: 人品特征 (必填)
-        :return: 提交结果
-        """
     data = request.json
-    user_id = session.get('user_id')  # 获取评论用户的ID
-    required_fields = ['name', 'university', 'department', 'academic', 'responsibility', 'character']
+    user_id = session.get('user_id')
 
+    # 新增权限校验
+    from service.database_service import DatabaseService
+    user_db = DatabaseService('user')
+    user_info = user_db.get_user(user_id)
+
+    if not user_info.get('review_allowed', 'True'):  # 默认允许提交
+        return jsonify({"error": "你已暂时被限制提交评价"}), 403
+
+    # 原有参数校验保持不变
+    required_fields = ['name', 'university', 'department', 'academic', 'responsibility', 'character']
     if not all(field in data for field in required_fields):
         return jsonify({"error": "缺少必要参数"}), 400
 
@@ -116,3 +114,34 @@ def delete_review():
     if not result["success"]:
         return jsonify({"error": result.get("message", "删除失败")}), 400
     return jsonify({"success": True})
+
+
+@recommend_blue.route('/toggle_permission', methods=['POST'])
+def toggle_review_permission():
+    """
+    管理员切换用户评价权限接口
+    请求参数：
+    - target_user: 要操作的用户ID
+    - enable: true/false 启用/禁用
+    """
+    # 验证管理员权限
+    if session.get('role') != '管理员':
+        return jsonify({"error": "权限不足"}), 403
+
+    data = request.json
+    required_fields = ['target_user', 'enable']
+    if not all(field in data for field in required_fields):
+        return jsonify({"error": "缺少必要参数"}), 400
+
+    try:
+        result = RecommendationService.toggle_review_permission(
+            target_user_id=data['target_user'],
+            enable=data.get('enable', 'True')
+        )
+
+        if result["success"]:
+            return jsonify(result), 200
+        return jsonify({"error": result["message"]}), 400
+
+    except Exception as e:
+        return jsonify({"error": f"服务器错误: {str(e)}"}), 500

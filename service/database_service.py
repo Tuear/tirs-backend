@@ -41,7 +41,7 @@ class DatabaseService:
                     user_id TEXT PRIMARY KEY,
                     hashed_password TEXT NOT NULL,
                     role TEXT CHECK(role IN ('学生', '管理员')) DEFAULT '学生',
-                    register_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    review_allowed TEXT DEFAULT 'True'  -- 新增权限字段（1为允许，0为禁止）
                 )''')
 
                 # 管理员表
