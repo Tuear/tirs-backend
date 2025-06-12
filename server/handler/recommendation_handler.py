@@ -1,5 +1,11 @@
+"""
+核心推荐引擎模块接口，提供导师推荐结果展示，导师详细信息查看功能
+"""
+
+
 from flask import Blueprint, request, jsonify
 from service.recommendation_service import RecommendationService
+from flask import session
 
 # 创建推荐引擎蓝图
 recommend_blue = Blueprint('recommendation', __name__, url_prefix='/recommend')
@@ -48,12 +54,13 @@ def submit_review():
         :return: 提交结果
         """
     data = request.json
+    user_id = session.get('user_id')  # 获取评论用户的ID
     required_fields = ['name', 'university', 'department', 'academic', 'responsibility', 'character']
 
     if not all(field in data for field in required_fields):
         return jsonify({"error": "缺少必要参数"}), 400
 
-    result = RecommendationService.submit_review(data)
+    result = RecommendationService.submit_review(data, user_id)
 
     if result["success"]:
         return jsonify({"message": result["message"]}), 200
@@ -81,6 +88,11 @@ def show_information():
 
 @recommend_blue.route('/get_all_reviews', methods=['GET'])
 def get_all_reviews():
+    """
+    获取所有评价接口
+    功能：返回所有评价的列表，包括评价ID、导师姓名、学校、学院/系、评价内容等
+    :return: 包含所有评价的列表
+    """
     result = RecommendationService.get_all_reviews()
     if not result["success"]:
         return jsonify({"error": result["message"]}), 400
@@ -89,6 +101,11 @@ def get_all_reviews():
 
 @recommend_blue.route('/delete_review', methods=['POST'])
 def delete_review():
+    """
+    删除评价接口
+    功能：根据评价ID删除指定的评价
+    :param sentence_id: 评价ID
+    """
     data = request.json
     sentence_id = data.get('sentence_id')
     # 添加参数校验

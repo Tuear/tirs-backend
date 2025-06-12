@@ -130,7 +130,7 @@ class RecommendationService:
         return hashlib.sha256(unique_string.encode()).hexdigest()
 
     @staticmethod
-    def submit_review(review_data):
+    def submit_review(review_data, user_id):
         """
         处理评价提交（设计文档用例03）
         """
@@ -156,7 +156,7 @@ class RecommendationService:
         sentence_id = f"sentence_{str(uuid4()).replace('-', '')}"
 
         # 生成唯一评价特征ID
-        txt_id = f"review_{str(uuid4()).replace('-', '')}"
+        feature_id = f"review_{str(uuid4()).replace('-', '')}"
 
         # 获取数据库服务实例
         professor_db = DatabaseService('professor')
@@ -175,10 +175,10 @@ class RecommendationService:
                 )
 
             # 存储review_sentence到review_sentences表
-            professor_db.create_review_sentence(sentence_id, tutor_id, review_sentence)
+            professor_db.create_review_sentence(sentence_id, tutor_id, user_id, review_sentence)
 
             # 存储review_features到review_features表
-            professor_db.create_review_features(txt_id, sentence_id, review_features)
+            professor_db.create_review_features(feature_id, sentence_id, review_features)
 
             return {"success": True, "message": "评价提交成功"}
 
@@ -245,24 +245,38 @@ class RecommendationService:
             # 获取所有评价语句及关联特征
             reviews = professor_db.execute_query('''
                 SELECT s.sentence_id, p.tutor_id, p.name, p.university, p.department, 
-                       s.review_sentence, t.review_features
+                       s.review_sentence, t.review_features, s.user_id
                 FROM review_sentences s
                 JOIN professor p ON s.tutor_id = p.tutor_id
                 LEFT JOIN review_features t ON s.sentence_id = t.sentence_id
             ''')
 
+            # 定义字段索引映射
+            FIELD_MAPPING = {
+                'sentence_id': 0,
+                'tutor_id': 1,
+                'name': 2,
+                'university': 3,
+                'department': 4,
+                'review_sentence': 5,
+                'review_features': 6,
+                'user_id': 7
+            }
+
             return {
                 "success": True,
                 "data": [{
-                    "sentence_id": row[0],
-                    "tutor_id": row[1],
-                    "name": row[2],
-                    "university": row[3],
-                    "department": row[4],
-                    "review_sentence": row[5],
-                    "review_features": row[6]
+                    "sentence_id": row[FIELD_MAPPING['sentence_id']],
+                    "tutor_id": row[FIELD_MAPPING['tutor_id']],
+                    "name": row[FIELD_MAPPING['name']],
+                    "university": row[FIELD_MAPPING['university']],
+                    "department": row[FIELD_MAPPING['department']],
+                    "review_sentence": row[FIELD_MAPPING['review_sentence']],
+                    "review_features": row[FIELD_MAPPING['review_features']],
+                    "user_id": row[FIELD_MAPPING['user_id']]
                 } for row in reviews]
             }
+
         except Exception as e:
             return {"success": False, "message": f"查询失败: {str(e)}"}
 
@@ -271,12 +285,6 @@ class RecommendationService:
         professor_db = DatabaseService('professor')
         try:
             professor_db.execute_update(sentence_id)
-            # professor_db.execute_update(
-            #     "DELETE FROM review_sentences WHERE sentence_id = ?",
-            #     (sentence_id,)
-            # )
-            # 使用新的写操作方法
-
             return {"success": True}
         except Exception as e:
             return {"success": False, "message": f"删除失败: {str(e)}"}

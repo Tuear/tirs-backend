@@ -76,24 +76,25 @@ class DatabaseService:
                     department TEXT
                 )''')
 
-                # 导师评价语句表：从上到下依次为：主键、外键、评价语句、键值关联语句
+                # 导师评价语句表：从上到下依次为：主键、外键、评价语句、键值关联语句（关联导师）、键值关联语句（关联用户）
                 cursor.execute('''
                 CREATE TABLE IF NOT EXISTS review_sentences (
                     sentence_id TEXT PRIMARY KEY,
                     tutor_id TEXT NOT NULL,
                     review_sentence TEXT NOT NULL,
-                    FOREIGN KEY (tutor_id) REFERENCES professor(tutor_id)
+                    user_id TEXT NOT NULL,
+                    FOREIGN KEY (tutor_id) REFERENCES professor(tutor_id),
+                    FOREIGN KEY (user_id) REFERENCES user(user_id)
                 )''')
 
-                # 导师评价特征表：从上到下依次为：主键、外键、评价特征、键值关联语句
+                # 导师评价特征表：从上到下依次为：主键、外键、评价特征、键值关联语句（关联导师）
                 cursor.execute('''
                 CREATE TABLE IF NOT EXISTS review_features (
-                    txt_id TEXT PRIMARY KEY,
+                    feature_id TEXT PRIMARY KEY,
                     sentence_id TEXT NOT NULL,
                     review_features TEXT NOT NULL,
                     FOREIGN KEY (sentence_id) REFERENCES review_sentences(sentence_id)
                 )''')
-
 
             conn.commit()
 
@@ -105,7 +106,7 @@ class DatabaseService:
 
     def execute_query(self, query: str, params: tuple = (), fetch_one: bool = False):
         """
-        执行SQL语句，支持查询和插入操作
+        执行SQL语句（查找，更新，删除等），若为查询语句则返回查询结果
         :param query: SQL语句
         :param params: 参数元组
         :param fetch_one: 是否只获取一条记录
@@ -141,6 +142,51 @@ class DatabaseService:
         )
         return bool(result)
 
+    def create_user(self, user_id: str, hashed_password: str, role: str = '学生') -> None:
+        """
+        创建新用户
+        """
+        self.execute_query(
+            "INSERT INTO user (user_id, hashed_password, role) VALUES (?, ?, ?)",
+            (user_id, hashed_password, role)
+        )
+
+    def get_user(self, user_id: str) -> dict:
+        """
+        获取用户信息
+        """
+        result = self.execute_query(
+            "SELECT * FROM user WHERE user_id = ?",
+            (user_id,),
+            fetch_one=True
+        )
+        if result:
+            return {
+                'user_id': result[0],
+                'hashed_password': result[1],
+                'role': result[2],
+                'register_time': result[3]
+            }
+        return None
+
+    def get_admin(self, admin_id: str) -> dict:
+        """
+        获取管理员信息
+        """
+        result = self.execute_query(
+            "SELECT * FROM admin WHERE admin_id = ?",
+            (admin_id,),
+            fetch_one=True
+        )
+        if result:
+            return {
+                'admin_id': result[0],
+                'admin_name': result[1],
+                'password': result[2],
+                'rights': result[3]
+            }
+        return None
+
     def professor_exists(self, tutor_id: str) -> bool:
         """
         检查导师是否存在
@@ -165,30 +211,30 @@ class DatabaseService:
             (tutor_id, name, university, department)
         )
 
-    def create_review_sentence(self, sentence_id: str, tutor_id: str, review_sentence: str) -> None:
+    def create_review_sentence(self, sentence_id: str, tutor_id: str, user_id: str, review_sentence: str) -> None:
         """
         创建评价语句记录
         """
         self.execute_query(
             """
             INSERT INTO review_sentences 
-            (sentence_id, tutor_id, review_sentence)
-            VALUES (?, ?, ?)
+            (sentence_id, tutor_id, user_id, review_sentence)
+            VALUES (?, ?, ?, ?)
             """,
-            (sentence_id, tutor_id, review_sentence)
+            (sentence_id, tutor_id, user_id, review_sentence)
         )
 
-    def create_review_features(self, txt_id: str, sentence_id: str, review_features: str) -> None:
+    def create_review_features(self, feature_id: str, sentence_id: str, review_features: str) -> None:
         """
         创建评价特征记录
         """
         self.execute_query(
             """
             INSERT INTO review_features 
-            (txt_id, sentence_id, review_features)
+            (feature_id, sentence_id, review_features)
             VALUES (?, ?, ?)
             """,
-            (txt_id, sentence_id, review_features)
+            (feature_id, sentence_id, review_features)
         )
 
     def execute_update(self, sentence_id) -> None:

@@ -1,3 +1,7 @@
+"""
+注册认证功能接口，包括注册、登录、退出登录、检查登录状态等功能
+"""
+
 from flask import Blueprint, request, jsonify, session
 from service.auth_service import AuthService
 from config import Config
@@ -10,7 +14,6 @@ auth_blue = Blueprint('auth', __name__, url_prefix='/auth')
 def register():
     """
     用户注册接口（设计文档用例01）
-    只允许邮箱注册
     """
     data = request.json
 
