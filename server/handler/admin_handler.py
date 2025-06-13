@@ -6,6 +6,8 @@ from service.recommendation_service import RecommendationService
 from flask import session
 from service.database_service import DatabaseService
 from service.review_service import ReviewService
+import os
+import psutil
 
 # 创建推荐引擎蓝图
 admin_blue = Blueprint('admin_function', __name__, url_prefix='/admin')
@@ -85,3 +87,56 @@ def toggle_review_permission():
 
     except Exception as e:
         return jsonify({"error": f"服务器错误: {str(e)}"}), 500
+
+
+@admin_blue.route('/platform_stats', methods=['GET'])
+def get_platform_stats():
+    """
+    获取平台统计信息接口
+    返回：评价总数、学校学院统计、用户总数、内存占用
+    """
+    # 验证管理员权限
+    if session.get('role') != '管理员':
+        return jsonify({"error": "权限不足"}), 403
+
+    try:
+        # 1. 获取评价总数
+        review_db = DatabaseService('professor')
+        review_count = review_db.execute_query(
+            "SELECT COUNT(*) FROM review_sentences",
+            fetch_one=True
+        )[0]
+
+        # 2. 获取学校/学院统计
+        school_stats = review_db.execute_query('''
+            SELECT university, department, COUNT(*) as count 
+            FROM professor 
+            GROUP BY university, department
+        ''')
+
+        # 处理成层级结构
+        school_data = defaultdict(lambda: {"departments": {}, "total": 0})
+        for uni, dept, count in school_stats:
+            school_data[uni]["departments"][dept] = count
+            school_data[uni]["total"] += count
+
+        # 3. 获取用户总数
+        user_db = DatabaseService('user')
+        user_count = user_db.execute_query(
+            "SELECT COUNT(*) FROM user",
+            fetch_one=True
+        )[0]
+
+        # 4. 获取内存占用（单位：MB）
+        process = psutil.Process(os.getpid())
+        memory_usage = round(process.memory_info().rss / 1024 / 1024, 2)
+
+        return jsonify({
+            "review_count": review_count,
+            "schools": school_data,
+            "user_count": user_count,
+            "memory_usage": f"{memory_usage} MB"
+        })
+
+    except Exception as e:
+        return jsonify({"error": f"获取统计失败: {str(e)}"}), 500
