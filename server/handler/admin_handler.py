@@ -2,12 +2,11 @@
 管理员功能接口，存放管理员可使用的功能接口
 """
 from flask import Blueprint, request, jsonify
-from service.recommendation_service import RecommendationService
 from flask import session
 from service.database_service import DatabaseService
 from service.review_service import ReviewService
 from utils.status_monitor import get_platform_stats
-from utils.status_monitor import get_all_users_information
+from utils.status_monitor import get_user_information
 
 # 创建推荐引擎蓝图
 admin_blue = Blueprint('admin_function', __name__, url_prefix='/admin')
@@ -111,7 +110,7 @@ def professor_update():
 
 
 # 修改路由函数名称和调用方式
-@admin_blue.route('/platform_stats', methods=['GET'])
+@admin_blue.route('/handle_platform_stats', methods=['GET'])
 def handle_platform_stats():  # 修改函数名称避免冲突
     """
     平台监控数据接口
@@ -125,8 +124,8 @@ def handle_platform_stats():  # 修改函数名称避免冲突
         return jsonify({"error": f"获取统计失败: {str(e)}"}), 500
 
 
-@admin_blue.route('/get_all_users_information', methods=['GET'])
-def handle_all_users_information():
+@admin_blue.route('/handle_user_information', methods=['POST'])
+def handle_user_information():
     """
     获取所有用户及其评价信息接口
     返回：包含所有用户及其完整评价信息的嵌套结构
@@ -135,6 +134,7 @@ def handle_all_users_information():
         return jsonify({"error": "权限不足"}), 403
 
     try:
-        return get_all_users_information()
+        data = request.json
+        return get_user_information(data['user_id'])
     except Exception as e:
         return jsonify({"error": f"获取数据失败: {str(e)}"}), 500

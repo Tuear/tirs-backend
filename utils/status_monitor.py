@@ -54,71 +54,77 @@ def get_platform_stats():
 from collections import OrderedDict
 
 
-def get_all_users_information():
+def get_user_information(user_id):
     """
-    获取所有用户及其评价信息
+    获取指定用户的相关信息
     返回结构：
     {
-        "users": [
-            {
-                "user_id": "用户ID",
-                "role": "角色",
-                "review_allowed": "是否允许评价",
-                "reviews": [ ... ]
-            },
-            ...更多用户
-        ]
+        "user": {
+            "user_id": "用户ID",
+            "role": "角色",
+            "review_allowed": "是否允许评价",
+            "reviews": [ ... ]
+        }
     }
     """
     try:
         user_db = DatabaseService('user')
         professor_db = DatabaseService('professor')
 
-        # 获取所有用户基本信息
-        users = user_db.execute_query('''
+        # 获取指定用户基本信息
+        user_info = user_db.execute_query(
+            '''
             SELECT u.user_id, u.role, u.review_allowed 
             FROM user u
-        ''')
+            WHERE u.user_id = ?
+            ''',
+            (user_id,),
+            fetch_one=True  # 只获取一条记录
+        )
+
+        # 如果用户不存在
+        if not user_info:
+            return jsonify({"error": "用户不存在"}), 404
+
+        # 构建用户基本信息
+        user_id = user_info[0]
+        role = user_info[1]
+        review_allowed = user_info[2]
+
+        # 获取该用户的所有评价
+        reviews = professor_db.execute_query(
+            '''
+            SELECT s.sentence_id, p.name, p.university, p.department, 
+                   s.review_sentence
+            FROM review_sentences s
+            JOIN professor p ON s.tutor_id = p.tutor_id
+            WHERE s.user_id = ?
+            ''',
+            (user_id,)
+        )
 
         # 使用OrderedDict确保字段顺序
-        result = {"users": []}
-        for user in users:
-            user_id = user[0]
-            role = user[1]
-            review_allowed = user[2]
+        user_obj = OrderedDict()
+        user_obj["user_id"] = user_id
+        user_obj["role"] = role
+        user_obj["review_allowed"] = review_allowed
 
-            # 获取用户的所有评价
-            reviews = professor_db.execute_query('''
-                SELECT s.sentence_id, p.name, p.university, p.department, 
-                       s.review_sentence
-                FROM review_sentences s
-                JOIN professor p ON s.tutor_id = p.tutor_id
-                WHERE s.user_id = ?
-            ''', (user_id,))
+        # 创建review列表
+        review_list = []
+        for row in reviews:
+            review_dict = OrderedDict([
+                ("sentence_id", row[0]),
+                ("tutor_name", row[1]),
+                ("university", row[2]),
+                ("department", row[3]),
+                ("review_sentence", row[4])
+            ])
+            review_list.append(review_dict)
 
-            # 使用OrderedDict确保字段顺序
-            user_obj = OrderedDict()
-            user_obj["user_id"] = user_id
-            user_obj["role"] = role
-            user_obj["review_allowed"] = review_allowed
+        user_obj["reviews"] = review_list
 
-            # 创建review列表
-            review_list = []
-            for row in reviews:
-                review_dict = OrderedDict([
-                    ("sentence_id", row[0]),
-                    ("tutor_name", row[1]),
-                    ("university", row[2]),
-                    ("department", row[3]),
-                    ("review_sentence", row[4])
-                ])
-                review_list.append(review_dict)
-
-            user_obj["reviews"] = review_list
-
-            result["users"].append(user_obj)
-
-        return jsonify(result)
+        # 返回单个用户对象
+        return jsonify({"user": user_obj})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
