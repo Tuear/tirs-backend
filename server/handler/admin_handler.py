@@ -85,3 +85,26 @@ def toggle_review_permission():
 
     except Exception as e:
         return jsonify({"error": f"服务器错误: {str(e)}"}), 500
+
+@admin_blue.route('/professor_update', methods=['POST'])
+def professor_update():
+    """
+    导师信息维护接口
+    """
+    # 验证管理员权限
+    if session.get('role') != '管理员':
+        return jsonify({"error": "权限不足"}), 403
+
+    data = request.json
+    user_id = '管理员'
+
+    # 验证必要字段
+    required_fields = ['name', 'university', 'department', 'academic', 'responsibility', 'character', 'professor_url']
+    if not all(field in data for field in required_fields):
+        return jsonify({"error": "缺少必要参数"}), 400
+
+    result = ReviewService.submit_review(data, user_id)
+
+    if result["success"]:
+        return jsonify({"message": "导师信息维护成功"}), 200
+    return jsonify({"error": result["message"]}), 400

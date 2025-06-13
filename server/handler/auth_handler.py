@@ -5,6 +5,7 @@
 from flask import Blueprint, request, jsonify, session
 from service.auth_service import AuthService
 from config import Config
+from utils.information_utils import export_universities_departments
 
 # 创建注册认证蓝图
 auth_blue = Blueprint('auth', __name__, url_prefix='/auth')
@@ -60,6 +61,7 @@ def login():
             return jsonify({"error": login_result["message"]}), 400
 
         # 登录成功
+        export_universities_departments()  # 更新支持的大学和学院信息
         return jsonify({"message": login_result["message"], "role": login_result["role"], "admin_id": user_id}), 200
 
     # 普通用户登录
@@ -70,6 +72,7 @@ def login():
             return jsonify({"error": login_result["message"]}), 400
 
         # 登录成功
+        export_universities_departments()  # 更新支持的大学和学院信息
         return jsonify({"message": login_result["message"], "role": login_result["role"], "user_id": user_id}), 200
 
 
