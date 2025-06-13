@@ -123,8 +123,8 @@ class RecommendationService:
             if combined_personality_features:
                 personality_match_percent = personality_matches / len(combined_personality_features)
 
-            # 3. 计算总体匹配度加权平均值（学术60%，性格40%）
-            total_match_percent = (academic_match_percent * 0.6) + (personality_match_percent * 0.4)
+            # 3. 计算总体匹配度加权平均值（学术50%，性格50%）
+            total_match_percent = (academic_match_percent * 0.5) + (personality_match_percent * 0.5)
 
             # 4. 转换为80-100范围内的分数
             # 基础分80 + 匹配度贡献20（匹配度100%时得到20分）
