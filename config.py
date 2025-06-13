@@ -33,6 +33,9 @@ class Config:
     # NLP模型配置
     NLP_MODEL_NAME = "zh_core_web_sm"  # 小型中文模型
 
+    # 导师URL
+    PROFESSOR_INFO_URLS_JSONL = os.path.join(BASE_DIR, 'database/professor_info_urls.jsonl')
+
     # NLP词典配置：学术特征词典
     ACADEMIC_TERMS = {
         # 基础学术词汇

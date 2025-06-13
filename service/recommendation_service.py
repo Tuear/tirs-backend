@@ -1,8 +1,7 @@
 from service.nlp_service import nlp_processor
 from service.database_service import DatabaseService
 import hashlib
-from config import Config
-
+import random
 
 # 推荐引擎类
 class RecommendationService:
@@ -30,6 +29,30 @@ class RecommendationService:
             return {"success": True, "message": answer}
 
     @staticmethod
+    def get_professor_url(tutor_id):
+        """根据导师ID获取信息URL"""
+        import json
+        import os
+        from config import Config
+
+        try:
+            if not os.path.exists(Config.PROFESSOR_INFO_URLS_JSONL):
+                return ""
+
+            with open(Config.PROFESSOR_INFO_URLS_JSONL, 'r', encoding='utf-8') as f:
+                for line in f:
+                    try:
+                        record = json.loads(line)
+                        if record.get('tutor_id') == tutor_id:
+                            return record.get('url', "")
+                    except json.JSONDecodeError:
+                        continue
+            return ""
+        except Exception as e:
+            print(f"获取URL失败: {str(e)}")
+            return ""
+
+    @staticmethod
     def get_recommendations(text, university, department):
         """
         获取推荐结果（实现完整推荐逻辑）
@@ -49,7 +72,7 @@ class RecommendationService:
         academic_features = positive_features["academic"]
         personality_features = positive_features["personality"]
 
-        # 合并“responsibility”和“人品”到性格特征
+        # 合并"responsibility"和"人品"到性格特征
         combined_personality_features = personality_features
 
         # 获取所有符合条件的导师ID
@@ -85,46 +108,63 @@ class RecommendationService:
             # 计算学术特征匹配分数
             academic_matches = len(set(academic_features) & set(tutor_academic_features))
             print(f"学术特征匹配数量: {academic_matches}")
-            academic_score = (academic_matches / len(academic_features)) * int(Config.ACADEMIC_WEIGHT) if academic_features else 0
 
             # 计算性格特征匹配分数
             personality_matches = len(set(combined_personality_features) & set(tutor_personality_features))
             print(f"性格特征匹配数量: {personality_matches}")
-            personality_score = (personality_matches / len(combined_personality_features)) * int(Config.PERSONALITY_WEIGHT) if combined_personality_features else 0
 
-            # 计算综合分数
-            total_score = academic_score + personality_score
+            # 1. 计算学术匹配度百分比
+            academic_match_percent = 0
+            if academic_features:
+                academic_match_percent = academic_matches / len(academic_features)
 
-            # 将匹配度分数添加到导师信息中
+            # 2. 计算性格匹配度百分比
+            personality_match_percent = 0
+            if combined_personality_features:
+                personality_match_percent = personality_matches / len(combined_personality_features)
+
+            # 3. 计算总体匹配度加权平均值（学术60%，性格40%）
+            total_match_percent = (academic_match_percent * 0.6) + (personality_match_percent * 0.4)
+
+            # 4. 转换为80-100范围内的分数
+            # 基础分80 + 匹配度贡献20（匹配度100%时得到20分）
+            base_score = 85  # 提高基础分数
+            match_bonus = 20 * total_match_percent
+            total_score = base_score + match_bonus
+
+            # 5. 确保分数在80-100之间
+            total_score = min(max(total_score, 80), 100)
+
+            # 6. 转换为整数百分比
+            total_score = int(round(total_score))
+
+            # 将分数添加到导师信息
             tutor_data = tutor_info["data"]
             tutor_data["match_score"] = total_score
             tutor_scores.append((tutor_data, total_score))
 
-        # 按综合分数从高到低排序
-        tutor_scores.sort(key=lambda x: x[1], reverse=True)
+        # 按综合分数从高到低排序 - 确保使用正确的排序键
+        tutor_scores.sort(key=lambda x: x[1], reverse=True)  # 按分数降序排序
 
         # 取前5个导师
         top_5_tutors = [tutor[0] for tutor in tutor_scores[:5]]
 
-        # 处理0分导师数据结构
+        # 处理最终结果
         processed_tutors = []
         for tutor in top_5_tutors:
-            if tutor["match_score"] == 0:
-                # 创建带提示信息的空数据结构
-                processed_tutors.append({
-                    "department": "",
-                    "match_score": 0,
-                    "name": "",
-                    "review_features": [],
-                    "review_sentences": [],
-                    "tutor_id": "",
-                    "university": "",
-                    "notice": "以下导师不符合您的要求，可以试试重新调整要求。"
-                })
-            else:
-                processed_tutors.append(tutor)
+            # 添加URL信息
+            tutor_data = {
+                "tutor_id": tutor["tutor_id"],
+                "name": tutor["name"],
+                "university": tutor["university"],
+                "department": tutor["department"],
+                "match_score": tutor["match_score"],
+                "url": RecommendationService.get_professor_url(tutor["tutor_id"])
+            }
+            processed_tutors.append(tutor_data)
 
         return {"success": True, "message": processed_tutors}
+
 
     @staticmethod
     def show_professor_information(tutor_id):

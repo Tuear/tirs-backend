@@ -6,6 +6,8 @@ from service.recommendation_service import RecommendationService
 from flask import session
 from service.database_service import DatabaseService
 from service.review_service import ReviewService
+from utils.status_monitor import get_platform_stats
+from utils.status_monitor import get_all_users_information
 
 # 创建推荐引擎蓝图
 admin_blue = Blueprint('admin_function', __name__, url_prefix='/admin')
@@ -34,8 +36,6 @@ def get_all_users():
     if not result["success"]:
         return jsonify({"error": result["message"]}), 400
     return jsonify(result)
-
-
 
 @admin_blue.route('/delete_review', methods=['POST'])
 def delete_review():
@@ -108,3 +108,33 @@ def professor_update():
     if result["success"]:
         return jsonify({"message": "导师信息维护成功"}), 200
     return jsonify({"error": result["message"]}), 400
+
+
+# 修改路由函数名称和调用方式
+@admin_blue.route('/platform_stats', methods=['GET'])
+def handle_platform_stats():  # 修改函数名称避免冲突
+    """
+    平台监控数据接口
+    返回：评价总数、学校学院统计、用户总数、内存占用
+    """
+    if session.get('role') != '管理员':
+        return jsonify({"error": "权限不足"}), 403
+    try:
+        return get_platform_stats()  # 调用模块中的函数
+    except Exception as e:
+        return jsonify({"error": f"获取统计失败: {str(e)}"}), 500
+
+
+@admin_blue.route('/get_all_users_information', methods=['GET'])
+def handle_all_users_information():
+    """
+    获取所有用户及其评价信息接口
+    返回：包含所有用户及其完整评价信息的嵌套结构
+    """
+    if session.get('role') != '管理员':
+        return jsonify({"error": "权限不足"}), 403
+
+    try:
+        return get_all_users_information()
+    except Exception as e:
+        return jsonify({"error": f"获取数据失败: {str(e)}"}), 500
