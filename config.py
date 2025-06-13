@@ -21,6 +21,9 @@ class Config:
     # 支持的大学JSON文件路径（绝对路径）
     SUPPORTED_UNIVERSITIES_JSON = os.path.join(BASE_DIR, 'database/supported_universities.json')
 
+    # 导师基本信息URL文件路径
+    PROFESSOR_INFO_URLS_JSONL = os.path.join(BASE_DIR, 'database/professor_info_urls.jsonl')
+
     # 用户角色定义（设计文档2.4.2）
     USER_ROLES = ('学生', '管理员')
 

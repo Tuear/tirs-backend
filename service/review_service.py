@@ -2,13 +2,14 @@ from utils.sensitive_filter import SensitiveFilter
 from service.recommendation_service import RecommendationService
 from service.database_service import DatabaseService
 from uuid import uuid4
+from utils.information_utils import write_professor_info_url
 
 
 
 # 评价服务类
 class ReviewService:
     @staticmethod
-    def submit_review(review_data, user_id):
+    def submit_review(review_data, user_id, url=''):
         """
         处理评价提交（设计文档用例03）
         """
@@ -57,6 +58,11 @@ class ReviewService:
 
             # 存储review_features到review_features表
             professor_db.create_review_features(feature_id, sentence_id, review_features)
+
+            # 评价提交成功后写入导师基本信息URL链接
+            if user_id == '管理员':
+                url = review_data['professor_url']
+            write_professor_info_url(tutor_id, url)
 
             return {"success": True, "message": "评价提交成功"}
 

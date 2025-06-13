@@ -52,9 +52,8 @@ def submit_review():
     # 权限校验
     user_db = DatabaseService('user')
     user_info = user_db.get_user(user_id)
-
-    review_allower = user_info.get('review_allowed', 'True')  # 默认允许提交
-    if review_allower == 'False':
+    review_allowed = user_info.get('review_allowed', 'True')  # 默认允许提交
+    if review_allowed == 'False':
         return jsonify({"error": "你已暂时被限制提交评价"}), 403
 
     # 原有参数校验保持不变
