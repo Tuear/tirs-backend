@@ -81,6 +81,11 @@ class RecommendationService:
             tutor_ids = [row[0] for row in professor_db.execute_query(
                 "SELECT tutor_id FROM professor"
             )]
+        elif department == "全部":
+            tutor_ids = [row[0] for row in professor_db.execute_query(
+                "SELECT tutor_id FROM professor WHERE university = ?",
+                (university,)
+            )]
         else:
             tutor_ids = [row[0] for row in professor_db.execute_query(
                 "SELECT tutor_id FROM professor WHERE university = ? AND department = ?",
