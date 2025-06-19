@@ -47,7 +47,7 @@ def submit_review():
     功能：接收用户提交的评价信息，保存到数据库
     """
     data = request.json
-    user_id = session.get('user_id')
+    user_id = data.get('user_id')
 
     # 权限校验
     user_db = DatabaseService('user')
