@@ -63,9 +63,9 @@ def toggle_review_permission():
     - target_user: 要操作的用户ID
     - enable: true/false 启用/禁用
     """
-    # 验证管理员权限
-    if session.get('role') != '管理员':
-        return jsonify({"error": "权限不足"}), 403
+    # # 验证管理员权限
+    # if session.get('role') != '管理员':
+    #     return jsonify({"error": "权限不足"}), 403
 
     data = request.json
     required_fields = ['target_user', 'enable']
@@ -91,8 +91,8 @@ def professor_update():
     导师信息维护接口
     """
     # 验证管理员权限
-    if session.get('role') != '管理员':
-        return jsonify({"error": "权限不足"}), 403
+    # if session.get('role') != '管理员':
+    #     return jsonify({"error": "权限不足"}), 403
 
     data = request.json
     user_id = '管理员'
@@ -116,8 +116,6 @@ def handle_platform_stats():  # 修改函数名称避免冲突
     平台监控数据接口
     返回：评价总数、学校学院统计、用户总数、内存占用
     """
-    if session.get('role') != '管理员':
-        return jsonify({"error": "权限不足"}), 403
     try:
         return get_platform_stats()  # 调用模块中的函数
     except Exception as e:
@@ -127,8 +125,8 @@ def handle_platform_stats():  # 修改函数名称避免冲突
 @admin_blue.route('/handle_user_information', methods=['POST'])
 def handle_user_information():
     """
-    获取所有用户及其评价信息接口
-    返回：包含所有用户及其完整评价信息的嵌套结构
+    获取单个用户及其评价信息接口
+    返回：包含单个用户及其完整评价信息的嵌套结构
     """
     if session.get('role') != '管理员':
         return jsonify({"error": "权限不足"}), 403

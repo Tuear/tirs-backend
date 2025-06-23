@@ -9,9 +9,8 @@ from collections import OrderedDict
 def get_platform_stats():
     """
     获取平台统计信息
-    返回：评价总数、学校学院统计、用户总数、内存占用
+    返回：评价总数、学校总数、学院总数、用户总数、内存占用
     """
-    # 移除多余的 try 语句块
     # 1. 获取评价总数
     review_db = DatabaseService('professor')
     review_count = review_db.execute_query(
@@ -19,18 +18,24 @@ def get_platform_stats():
         fetch_one=True
     )[0]
 
-    # 2. 获取学校/学院统计
+    # 2. 获取学校/学院统计（并计算聚合值）
     school_stats = review_db.execute_query('''
         SELECT university, department, COUNT(*) as count 
         FROM professor 
         GROUP BY university, department
     ''')
 
-    # 处理成层级结构
+    # 处理成层级结构（保留原逻辑，用于后续聚合）
     school_data = defaultdict(lambda: {"departments": {}, "total": 0})
     for uni, dept, count in school_stats:
         school_data[uni]["departments"][dept] = count
         school_data[uni]["total"] += count
+
+    # 🔴 新增：计算“学校总数”和“学院总数”
+    schools_total = len(school_data)  # 不同大学的数量
+    departments_total = sum(
+        len(school["departments"]) for school in school_data.values()
+    )  # 所有大学的学院数量之和
 
     # 3. 获取用户总数
     user_db = DatabaseService('user')
@@ -43,9 +48,13 @@ def get_platform_stats():
     process = psutil.Process(os.getpid())
     memory_usage = round(process.memory_info().rss / 1024 / 1024, 2)
 
+    # 🔴 调整返回结构：让 schools 包含 total（学校总数）和 departments（学院总数）
     return jsonify({
         "review_count": review_count,
-        "schools": school_data,
+        "schools": {
+            "total": schools_total,        # 学校总数
+            "departments": departments_total  # 学院总数
+        },
         "user_count": user_count,
         "memory_usage": f"{memory_usage} MB"
     })
