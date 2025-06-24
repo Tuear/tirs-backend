@@ -95,7 +95,7 @@ def professor_update():
     #     return jsonify({"error": "权限不足"}), 403
 
     data = request.json
-    user_id = '管理员'
+    user_id = '管理员维护'
 
     # 验证必要字段
     required_fields = ['name', 'university', 'department', 'academic', 'responsibility', 'character', 'professor_url']
