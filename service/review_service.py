@@ -60,7 +60,7 @@ class ReviewService:
             professor_db.create_review_features(feature_id, sentence_id, review_features)
 
             # 评价提交成功后写入导师基本信息URL链接
-            if user_id == '管理员':
+            if user_id == '管理员维护':
                 url = review_data['professor_url']
             write_professor_info_url(tutor_id, url)
 
