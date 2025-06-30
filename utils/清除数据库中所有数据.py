@@ -33,17 +33,19 @@ def clear_professor_database():
                 cursor.execute(f"DELETE FROM {table}")
                 print(f"已清空表: {table} (删除了 {cursor.rowcount} 行数据)")
 
-            # 重置自增计数器（虽然您的表没有自增列，但保留以防未来扩展）
-            cursor.execute("DELETE FROM sqlite_sequence")
+            # 重置自增计数器（仅在表存在时执行）
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sqlite_sequence'")
+            if cursor.fetchone():
+                cursor.execute("DELETE FROM sqlite_sequence")
 
             # 启用外键约束
             cursor.execute("PRAGMA foreign_keys = ON")
 
-            # 清理数据库文件空间
-            cursor.execute("VACUUM")
-
-            conn.commit()
+            conn.commit()  # 先提交事务
             print("数据库已成功清空，所有表数据已删除")
+
+            # 清理数据库文件空间（必须在事务外执行）
+            cursor.execute("VACUUM")
 
             # 验证清空结果
             for table in tables:

@@ -1,44 +1,54 @@
-import os
+import requests
+from bs4 import BeautifulSoup
+import random
+import hashlib
+import time
+from urllib.parse import urljoin
+import re
+import logging
+import traceback
+import sys
+from datetime import datetime
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+import urllib3
 
-# 配置类，用于存储全局变量
-class Config:
-    DEBUG = True
-    # 加密密钥
-    SECRET_KEY = 'r5#2j$45sgl@1!dq1vz_'  # 用于session加密
+# 添加项目根目录到Python路径
+sys.path.append('D:/syk/tirs-backend')
 
-    # 密码加密参数
-    BCRYPT_LOG_ROUNDS = 12
+# 导入服务模块
+from service.review_service import ReviewService
 
-    # 推荐算法参数
-    ACADEMIC_WEIGHT = 50  # 学术特征权重
-    PERSONALITY_WEIGHT = 50  # 性格特征权重
+# 禁用SSL警告
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-    # 独立数据库路径（使用绝对路径，避免路径问题）
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # 获取项目根目录绝对路径
-    USER_DB_PATH = os.path.join(BASE_DIR, 'database/user_db.sqlite')  # 用户数据库路径
-    PROFESSOR_DB_PATH = os.path.join(BASE_DIR, 'database/professor_db.sqlite')  # 导师数据库路径
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(f"tutor_crawler_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"),
+        logging.StreamHandler()
+    ]
+)
 
-    # 支持的大学JSON文件路径（绝对路径）
-    SUPPORTED_UNIVERSITIES_JSON = os.path.join(BASE_DIR, 'database/supported_universities.json')
+logger = logging.getLogger(__name__)
 
-    # 导师基本信息URL文件路径
-    PROFESSOR_INFO_URLS_JSONL = os.path.join(BASE_DIR, 'database/professor_info_urls.jsonl')
+# 只保留华中师范大学教育学院
+universities = [
+    {
+        "name": "华中师范大学",
+        "url": "https://edu.ccnu.edu.cn/szdw/zrjs/qtjs.htm",
+        "list_selector": ""
+    }
+]
 
-    # 用户角色定义（设计文档2.4.2）
-    USER_ROLES = ('学生', '管理员')
+# 院系列表 (固定为教育学院)
+departments = ["教育学院"]
 
-    # 管理员前缀标识（设计文档1.5）
-    ADMIN_ID_PREFIX = 'admin_'
-
-    # NLP模型配置
-    NLP_MODEL_NAME = "zh_core_web_sm"  # 小型中文模型
-
-    # 导师URL
-    PROFESSOR_INFO_URLS_JSONL = os.path.join(BASE_DIR, 'database/professor_info_urls.jsonl')
-
-    # NLP词典配置：学术特征词典
-    ACADEMIC_TERMS = {
-        # 基础学术词汇
+# 特征列表
+academic_traits = [
+            # 基础学术词汇
         "学术", "研究", "论文", "项目", "课题", "实验", "发表", "期刊", "会议", "专利",
         "算法", "模型", "数据", "分析", "理论", "方法", "创新", "成果", "领域", "方向",
         # 研究类型
@@ -130,14 +140,6 @@ class Config:
         "项目申报", "标书精炼", "答辩出色", "结题优秀", "延续获批",
         "团队建设", "人才梯队", "国际合作", "产学联动", "平台搭建",
         "学术品牌", "声誉卓著", "奖项收割", "荣誉等身", "头衔丰富",
-        # 发展支持（40词）
-        "深造推荐", "名校直推", "导师引荐", "奖学金助", "签证协助",
-        "实习内推", "名企资源", "岗位定制", "简历精修", "面试特训",
-        "职业测评", "能力画像", "人脉拓展", "行业对接", "创业孵化",
-        "路演辅导", "融资引介", "公司注册", "股权设计", "法务支持",
-        "心理疏导", "压力管理", "时间规划", "健康关怀", "紧急援助",
-        "住宿协调", "餐饮补贴", "交通补助", "通讯支持", "健身资源",
-        "兴趣社群", "文体活动", "家庭关怀", "子女教育", "生活管家",
 
         #基础学术词汇与研究类型
         "搞科研的", "做学问的", "写paper", "发文章", "做项目的", "搞课题的", "做实验的", "发paper", "投期刊", "赶会议",
@@ -149,10 +151,6 @@ class Config:
         "项目预算", "硬件软件资源", "科研资金", "实验场地", "仪器设备", "数据仓库", "参考资料", "文献库", "训练数据集",
         "GPU算力", "经济实力", "资源到位", "经费给力", "预算充足", "经费有保障", "资金到位", "设备管够", "资源共享",
         "高效利用设备", "财大气粗", "资金后盾强", "资金保障足", "资金倾斜多", "资金支持给劲儿", "资金紧张",
-
-        # 研究产出与成果
-        "发表的文章", "出版的书籍", "学术专著", "专业著作", "研究报告", "软件著作权", "代码版权", "技术文档",
-        "系统方案",
 
         # 学术评价体系
         "期刊影响力指数", "被引次数", "检索收录", "顶级期刊", "顶尖会议", "核心刊物", "SCI期刊", "EI索引", "社科核心",
@@ -179,11 +177,9 @@ class Config:
         "顶刊发文", "高水平论文", "研究资源丰富", "经费充足",
         "硬件设备好", "学术交流多", "产学研结合", "项目经验丰富",
         "科研训练系统", "课题前沿", "算法优化", "模型创新"
+]
 
-    }
-
-    # NLP词典配置：性格特征词典
-    PERSONALITY_TERMS = {
+responsibility_traits = [
         # 基本性格特征
         "耐心", "严格", "轻松", "负责任", "友好", "压力大", "氛围", "团队", "指导", "沟通",
         "时间", "自由", "支持", "帮助", "经验", "开放", "鼓励", "要求", "关心", "交流", "佛系",
@@ -266,7 +262,9 @@ class Config:
         "灵活变通", "因地制宜", "个性定制", "因材施教", "量体裁衣",
         "信任授权", "大胆放手", "关键把控", "保驾护航", "全程守护",
         "教学相长", "亦师亦友", "共同成长", "成就彼此", "互相照亮",
+]
 
+character_traits = [
         #基本性格特征与指导风格
         "特别有耐心", "脾气很好", "不急不躁", "要求挺严格的", "比较较真", "规矩比较多", "氛围比较轻松", "不会太紧张",
         "挺随和的", "超级负责任", "做事很靠谱", "交给ta很放心", "人很友好", "很好相处", "没什么架子", "感觉压力有点大",
@@ -320,30 +318,228 @@ class Config:
         "亲和力强", "幽默风趣", "团队合作", "包容多元",
         "不抢功劳", "保护学生", "不压榨", "关心成长",
         "热心肠", "责任心强", "学术道德高", "生活简朴"
-    }
+]
 
-    # NLP词典配置：否定词列表
-    NEGATION_WORDS = {"不", "没", "无", "非", "否", "未", "莫", "勿", "没有", "不用", "不要","不想要"}
+# 用户ID池
+USER_IDS = ["柒尾", "杨梅", "舒凡", "BR", "姚tt"]
 
-    # 敏感词配置
-    SENSITIVE_WORDS = {
-        # 骂人词汇
-        "傻逼", "操你妈", "贱人", "死全家", "死吧", "滚蛋", "去死", "逼", "丫的", "傻X", "垃圾", "脑残", "窝里横",
-        "傻吊", "笨蛋", "傻逼", "婊子", "流氓", "猪", "死鬼", "贱货", "王八蛋", "白痴", "死狗", "草泥马", "滚犊子",
-        "脑袋坏了", "一脚踢死你", "操蛋", "死妈", "死你妈", "你妈死了", "他妈的", "干你妈", "死光光", "疯子", "滚你妈",
-        "滚出去", "傻逼玩意", "猪猩", "傻子", "豺狼", "死丫头", "无耻", "给我闭嘴", "我艹", "肉便器", "脑袋坏掉",
-        "狗屎", "傻逼国", "狗日的", "插你", "窝里横", "王八蛋", "黄B", "傻比", "放屁", "二百五", "傻逼货","我日",
-        "鸡把","基霸","几把", "傻呗", "傻b", "你妈死", "傻B",
+# 设置请求头
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+}
 
-        # 政治敏感词汇
-        "六四", "天安门", "法轮功", "维权", "民主运动", "暴乱", "中国崩溃", "暴力革命", "独立运动", "西藏独立",
-        "台湾独立", "藏独", "台独", "反动", "共产党倒台", "法轮功学员", "民主墙", "自由中国", "共产邪教",
-        "政治犯", "自由民主", "普世价值", "人民公敌", "一国两制", "香港暴乱", "暴力示威", "台海战争", "中共专政",
-        "党内斗争", "共产极权", "镇压", "拆解共产党", "社会主义崩溃", "极权政府", "民主自由", "共产党垮台",
-        "反党", "破坏党政", "独裁政权", "左派右派", "政治迫害", "资产阶级", "阶级斗争", "异见分子", "共产党腐败",
-        "全国人大无用", "统战部", "特务", "文化大革命", "红卫兵", "毛泽东思想", "建国大业", "国有化", "意识形态",
-        "公有制", "和谐社会", "社会主义核心价值观", "暴力镇压", "黑帮政治", "一党制", "领导人崇拜", "党国",
-        "秘密警察", "暴力清洗", "集权政治", "强烈抗议", "迫害", "镇压维权", "封杀言论", "审查制度", "言论自由",
-        "反腐斗争", "三反五反", "政治斗争", "党员腐化", "走资派", "反右斗争", "经济制裁", "国际制裁", "资产阶级复辟",
-        "共产党","党","习近平","习主席","社会主义","中共",
-    }
+def create_session():
+    """创建带有重试机制的会话"""
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=3,
+        backoff_factor=1,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET"]
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+def parse_ccnu_tutors(soup, base_url):
+    """解析华中师范大学教育学院导师页面"""
+    tutor_list = []
+    # 定位教授和副教授部分
+    sections = soup.find_all('div', class_='texts')
+    if not sections:
+        logger.warning("未找到导师内容区域")
+        return tutor_list
+
+    # 遍历所有教授和副教授部分
+    for section in sections:
+        # 定位所有导师列表
+        ul_tags = section.find_all('ul')
+        for ul in ul_tags:
+            # 定位每个导师的<li>标签
+            li_tags = ul.find_all('li')
+            for li in li_tags:
+                # 提取导师姓名
+                name = li.get_text(strip=True)
+                if len(name) < 2 or len(name) > 4:
+                    continue
+
+                # 提取导师个人页面链接
+                a_tag = li.find('a')
+                if a_tag:
+                    url = a_tag.get('href')
+                    if url and not url.startswith('http'):
+                        url = urljoin(base_url, url)
+                else:
+                    url = ''
+
+                # 构造导师信息字典
+                tutor_list.append({
+                    'name': name,
+                    'position': '',
+                    'research': '',
+                    'url': url,
+                    'university': "华中师范大学",
+                    'department': "教育学院",  # 固定学院
+                })
+
+    return tutor_list
+
+def get_tutor_info_from_web(url, university_name):
+    """获取导师信息（华中师范大学专用）"""
+    try:
+        logger.info(f"正在爬取 [{university_name}] : {url}")
+        session = create_session()
+        response = session.get(url, headers=HEADERS, timeout=30, verify=False)
+
+        if response.status_code != 200:
+            logger.warning(f"访问失败，状态码: {response.status_code}")
+            return []
+
+        soup = BeautifulSoup(response.content, 'html.parser', from_encoding='utf-8')
+
+        if university_name == "华中师范大学":
+            return parse_ccnu_tutors(soup, url)
+
+        return []  # 其他大学处理（本示例不需要）
+
+    except Exception as e:
+        logger.error(f"获取导师信息出错: {str(e)}\n{traceback.format_exc()}")
+        return []
+
+def generate_reviews_for_tutor(tutor_info):
+    """为单个导师生成1-5条评价数据"""
+    reviews = []
+    # 随机生成1-5条评价
+    num_reviews = random.randint(1, 3)
+
+    for _ in range(num_reviews):
+        try:
+            # 对于每条评价，每个特征部分随机抽取1或2个特征
+            num_academic = random.choice([1, 2])
+            num_responsibility = random.choice([1, 2])
+            num_character = random.choice([1, 2])
+
+            # 从特征列表中随机抽取指定数量的特征
+            academic_features = random.sample(academic_traits, num_academic)
+            responsibility_features = random.sample(responsibility_traits, num_responsibility)
+            character_features = random.sample(character_traits, num_character)
+
+            # 组合成评价
+            review = {
+                "name": tutor_info['name'],
+                "university": tutor_info['university'],
+                "department": tutor_info['department'],  # 使用固定学院
+                "academic": ", ".join(academic_features),
+                "responsibility": ", ".join(responsibility_features),
+                "character": ", ".join(character_features),
+                "user_id": random.choice(USER_IDS),
+                "position": tutor_info.get('position', ''),
+                "research": tutor_info.get('research', ''),
+                "url": tutor_info.get('url', '')
+            }
+            reviews.append(review)
+        except Exception as e:
+            logger.error(f"生成单条评价失败: {str(e)}")
+            continue
+
+    return reviews
+
+def generate_tutor_id(name, university, department):
+    """生成唯一导师ID"""
+    try:
+        identifier = f"{name}_{university}_{department}"
+        return f"tutor_{hashlib.sha256(identifier.encode()).hexdigest()[:16]}"
+    except Exception as e:
+        logger.error(f"生成导师ID失败: {str(e)}")
+        return None
+
+
+def submit_to_database(review_data):
+    """提交评价数据到数据库"""
+    try:
+        # 生成导师ID
+        tutor_id = generate_tutor_id(
+            review_data['name'],
+            review_data['university'],
+            review_data['department']
+        )
+
+        # 准备提交数据
+        review_payload = {
+            'name': review_data['name'],
+            'university': review_data['university'],
+            'department': review_data['department'],
+            'academic': review_data['academic'],
+            'responsibility': review_data['responsibility'],
+            'character': review_data['character'],
+            'tutor_id': tutor_id,
+            'position': review_data.get('position', ''),
+            'research': review_data.get('research', ''),
+            'url': review_data.get('url', '')
+        }
+
+        # 提交评价
+        user_id = review_data['user_id']
+        result = ReviewService.submit_review(review_payload, user_id)
+
+        if result.get('success'):
+            logger.info(f"✅ 提交成功: {review_data['name']} - {review_data['university']}")
+        else:
+            logger.error(f"❌ 提交失败: {review_data['name']} - {result.get('message', '未知错误')}")
+
+        return result
+    except Exception as e:
+        logger.error(f"提交评价到数据库时出错: {str(e)}")
+        return {"success": False, "message": str(e)}
+
+
+
+def main():
+    logger.info("开始导师信息爬取和评价生成")
+    all_tutors = []
+
+    # 爬取导师信息
+    for uni in universities:
+        try:
+            logger.info(f"爬取 {uni['name']} 导师信息...")
+            tutors = get_tutor_info_from_web(uni['url'], uni['name'])
+
+            if tutors:
+                sample_names = [t['name'] for t in tutors[:3]]
+                logger.info(f"提取到的导师: {', '.join(sample_names)}{'...' if len(tutors) > 3 else ''}")
+                all_tutors.extend(tutors)
+                logger.info(f"√ 成功爬取 {len(tutors)} 位导师")
+            else:
+                logger.warning(f"★ 未找到 {uni['name']} 的导师信息")
+
+            time.sleep(1)  # 请求间隔
+
+        except Exception as e:
+            logger.error(f"爬取 {uni['name']} 失败: {str(e)}")
+
+    # 生成评价并提交到数据库
+    logger.info(f"爬取完成！共获取 {len(all_tutors)} 位导师信息")
+    successful_reviews = 0
+    failed_reviews = 0
+
+    # 为每位导师生成1-5条评价
+    for tutor in all_tutors:
+        reviews = generate_reviews_for_tutor(tutor)
+        if not reviews:
+            logger.warning(f"导师 {tutor['name']} 没有生成任何评价")
+            failed_reviews += 1
+            continue
+
+        for review in reviews:
+            result = submit_to_database(review)
+            if result.get('success'):
+                successful_reviews += 1
+            else:
+                failed_reviews += 1
+
+    logger.info(f"所有评价生成完成！成功: {successful_reviews}, 失败: {failed_reviews}")
+
+
+if __name__ == "__main__":
+    main()
